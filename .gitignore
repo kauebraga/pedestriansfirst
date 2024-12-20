@@ -71,3 +71,6 @@ temp
 teste_kaue
 cache
 input_data
+.Rhistory
+.Rprofile
+*.Rproj
