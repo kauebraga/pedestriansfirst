@@ -21,7 +21,7 @@ from shapely.geometry import Point
 
 from zipfile import ZipFile
 
-from frame1.get_jurisdictions import get_jurisdictions
+from funs.get_jurisdictions import get_jurisdictions
 
 from datetime import datetime
 
@@ -30,8 +30,10 @@ def get_GTFS_from_mobility_database(hdc, sources_loc='input_data/gtfs/gtfs_sourc
     
 
     # Get the current date and format it as yearmonth
-    year = datetime.now().strftime("%Y")
-    today_yearmonth = datetime.now().strftime("%Y%m")
+    year = "2025"
+    # year = datetime.now().strftime("%Y")
+    today_yearmonth = "202501""
+    # today_yearmonth = datetime.now().strftime("%Y%m")
 
 
     # collect boundaries

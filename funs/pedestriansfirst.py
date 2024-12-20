@@ -26,19 +26,166 @@ from shapely.ops import unary_union, transform
 import shapely.ops
 import topojson
 
-from  frame1.isochrones import *
-from  frame1.get_service_locations import *
-from  frame1.gtfs_parser import *
-from  frame1.prep_bike_osm import *
-from  frame1.prep_pop_ghsl import *
+from  funs.isochrones import *
+from  funs.get_service_locations import *
+from  funs.gtfs_parser import *
+from  funs.prep_bike_osm import *
+from  funs.prep_pop_ghsl import *
 # import access
 #import summarize_ttm
 
 import pdb
+import time
+
+
+def process_bike(edges, quilt_allbike, quilt_protectedbike, center_nodes):
+
+	# Convert graph to data.frame
+	# Preprocessing to handle columns
+	# edges = ox.graph_to_gdfs(G_allroads, nodes=False)
+
+	edges = edges.drop(columns=[
+		'name',
+		'width',
+		'oneway',
+		'reversed',
+		'length',
+		'lanes',
+		'ref',
+		'maxspeed',
+		'access',
+		'bridge',
+		'service',
+		'junction'
+		# 'area',
+		])
+
+	for col in [
+		'highway',
+		'cycleway',
+		'bicycle',
+		'cycleway:left',
+		'cycleway:right',
+		'cycleway:both',
+		]:
+		if col not in edges.columns:
+			edges[col] = ''
+
+	bike_conditions = (edges['highway'] == 'cycleway') \
+		| (edges['highway'] == 'path') & (edges['bicycle']
+			== 'designated') | edges['cycleway:right'].isin(['track',
+			'lane', 'opposite_track']) | edges['cycleway:left'
+			].isin(['track', 'lane', 'opposite_track']) \
+		| edges['cycleway:both'].isin(['track', 'lane', 'opposite_track'
+			]) | edges['cycleway'].isin(['track', 'lane',
+			'opposite_track'])
+
+	# Filter only the bike network
+
+	edges = edges[bike_conditions]
+	total_allbike = edges
+
+	# Add a column to tag protected bike infrastructure
+
+	total_allbike['is_protected'] = (total_allbike['highway']
+			== 'cycleway') | (total_allbike['highway'] == 'path') \
+		& (total_allbike['bicycle'] == 'designated') \
+		| total_allbike['cycleway:right'].isin(['track',
+			'opposite_track']) | total_allbike['cycleway:left'
+			].isin(['track', 'opposite_track']) \
+		| total_allbike['cycleway:both'].isin(['track', 'opposite_track'
+			]) | total_allbike['cycleway'].isin(['track',
+			'opposite_track'])
+
+	# Remove isolated segments for bike infrastructure
+
+	total_allbike['in_real_network'] = 'unknown'
+
+	# Removing isolated lanes (all types) in one step
+
+	def identify_real_network(total_allbike, min_radius=1000, max_jump=300):
+		total_allbike['in_real_network'] = 'unknown'  # Initialize column if not already present
+
+		for idx in total_allbike.index:
+			already_identified = total_allbike.loc[idx,
+					'in_real_network'] == 'unknown'
+
+			# Handle case where 'in_real_network' might be a Series
+
+			if isinstance(already_identified, pd.Series):
+				already_identified = already_identified.any()
+
+			if already_identified:
+				connected_indices = [idx]
+				if shapely.minimum_bounding_radius(total_allbike.loc[connected_indices,
+						'geometry'].unary_union) > min_radius:
+					total_allbike.loc[connected_indices,
+							'in_real_network'] = 'yes'
+				else:
+					for _ in range(10):  # Safety loop to avoid infinite iterations
+						connected_network = \
+							total_allbike.loc[connected_indices,
+								'geometry'].unary_union
+						nearby = \
+							total_allbike[total_allbike.distance(connected_network)
+								< max_jump]
+
+						if 'yes' in nearby['in_real_network'].unique():
+							total_allbike.loc[connected_indices,
+									'in_real_network'] = 'yes'
+							break
+
+						if set(connected_indices) == set(nearby.index):
+							if shapely.minimum_bounding_radius(total_allbike.loc[connected_indices,
+									'geometry'].unary_union) \
+								> min_radius:
+								total_allbike.loc[connected_indices,
+										'in_real_network'] = 'yes'
+							else:
+								total_allbike.loc[connected_indices,
+										'in_real_network'] = 'no'
+							break
+						else:
+							connected_indices = list(nearby.index)
+
+					# Final check to ensure network meets minimum radius
+
+					if shapely.minimum_bounding_radius(total_allbike.loc[connected_indices,
+							'geometry'].unary_union) > min_radius:
+						total_allbike.loc[connected_indices,
+								'in_real_network'] = 'yes'
+
+		return total_allbike[total_allbike['in_real_network'] == 'yes']
+
+	# Apply function
+
+	total_allbike = identify_real_network(total_allbike)
+
+	# Separate protected and all-bike networks
+
+	total_protectedbike = total_allbike[total_allbike['is_protected']]
+
+	# Adding to quilt and center_nodes
+
+	quilt_allbike = pd.concat([quilt_allbike, total_allbike])
+	quilt_protectedbike = pd.concat([quilt_protectedbike,
+									total_protectedbike])
+
+	center_nodes['pnpb'] = set(total_protectedbike.index.map(lambda x: \
+							   x[0]).tolist()
+							   + total_protectedbike.index.map(lambda x: \
+							   x[1]).tolist())
+	center_nodes['pnab'] = set(total_allbike.index.map(lambda x: \
+							   x[0]).tolist()
+							   + total_allbike.index.map(lambda x: \
+							   x[1]).tolist())
+
+	return (quilt_allbike, quilt_protectedbike, center_nodes)
 
 
 
-def make_patches(boundaries_latlon, crs_utm, patch_length = 10000, buffer = 500): #patch_length and buffer in m
+
+def make_patches(boundaries_latlon, crs_utm, patch_length = 50000, buffer = 500): #patch_length and buffer in m
     ''' 
     'tile' the boundaries of a city into patches, like a patchwork quilt, including a buffer
     buffer should be half the length of the longest PNX distance
@@ -147,8 +294,7 @@ def weighted_pop_density(array):
 
 
 
-# boundaries= total_poly_latlon
-# name = analysis_areas.loc[0,'name']
+# boundaries= total_poly_latlon; name = analysis_areas.loc[0,'name']; boundary_buffer = 1000; id_code = hdc; patch_length = 50000; buffer_dist=100; ghsl_resolution = '1000', headway_threshold=10
 
 def spatial_analysis(boundaries, 
                       id_code,
@@ -165,7 +311,7 @@ def spatial_analysis(boundaries,
                            'carfree',
                            'blocks',
                            'density',
-                           'pnft',
+                           'pnft', # VOLTAR PRO PADRAO!!!
                            'pnrt',
                            'pnpb', #protected bikeways
                            'pnab', #all bikeways
@@ -190,7 +336,7 @@ def spatial_analysis(boundaries,
                             },
                       years = [1975, 1980, 1985, 1990, 1995, 2000, 2005, 2010, 2015, 2020, 2022, 2024, 2025], #for PNRT and pop_dens. remember range(1,3) = [1,2]
                       current_year = 2024,
-                      patch_length = 16000, #m
+                      patch_length = 50000, #m
                       block_patch_length = 1000, #m
                       boundary_buffer = 1000, #m
                       blocks_simplification = 0.0001, #topo-simplification
@@ -217,7 +363,7 @@ def spatial_analysis(boundaries,
     ox.utils.config(log_console = False)
     
     useful_tags = ox.settings.useful_tags_way + ['cycleway', 'cycleway:left', 'cycleway:right', 'cycleway:both', 'bicycle']
-    ox.config(use_cache=True, log_console=True, useful_tags_way=useful_tags)
+    ox.config(use_cache=True, log_console=False, useful_tags_way=useful_tags)
     walk_filter = ('["area"!~"yes"]["highway"]["highway"!~"link|motor'
                    '|proposed|construction|abandoned'
                    '|platform|raceway"]'
@@ -275,8 +421,10 @@ def spatial_analysis(boundaries,
     service_point_locations={}
     if len(testing_services) > 0:
         handler = ServiceHandler()
-        handler.apply_file(folder_name+'temp/city.osm.pbf', locations=True)
+        # !!!!!!!!! AQUI LENTO!!!!!!!
+        handler.apply_file(folder_name+f'temp/city_{current_year}.osm.pbf', locations=True)
         for service in testing_services:
+          # service = testing_services[1]
             coords = handler.locationlist[service]
             service_point_locations[service] = gpd.GeoDataFrame(
                 geometry = [Point(coord) for coord in coords],
@@ -284,8 +432,8 @@ def spatial_analysis(boundaries,
         citywide_carfree = handler.carfreelist
                 
     if 'pnab' in to_test or 'pnpb' in to_test:
-        testing_services.append('pnpb')
         testing_services.append('pnab')
+        testing_services.append('pnpb')
         
     if 'highways' in to_test:
         all_highway_lines = []
@@ -329,11 +477,7 @@ def spatial_analysis(boundaries,
 
     if 'pnft' in to_test:
         testing_services.append('pnft')
-        freq_stops, gtfs_wednesdays = get_frequent_stops(
-        # freq_stops, gtfs_wednesdays = gtfs_parser.get_frequent_stops(
-            boundaries, 
-            folder_name, 
-            headway_threshold)
+        freq_stops, gtfs_wednesdays = get_frequent_stops(hdc = id_code, year = current_year, folder_name = folder_name, headwaylim = headway_threshold)
         service_point_locations['pnft'] = freq_stops
         gtfs_filenames = [file for file in os.listdir(folder_name+'temp/gtfs/') if file[-4:] == '.zip']
         
@@ -341,8 +485,8 @@ def spatial_analysis(boundaries,
             
     if 'pnrt' in to_test:
         #get the dataitdp_modes = rt_lines.apply(lambda z: get_line_mode(z['mode'], z['name'], z['agency'], z['region'], z['grade'], z['brt_rating']), axis=1)        
-        rt_lines = gpd.read_file('input_data/transit_explorer/geojson/lines.geojson')
-        rt_stns = gpd.read_file('input_data/transit_explorer/geojson/stations.geojson')
+        rt_lines = gpd.read_file(f'input_data/transit_explorer/{current_year}/geojson/lines.geojson')
+        rt_stns = gpd.read_file(f'input_data/transit_explorer/{current_year}/geojson/stations.geojson')
         #geospatial clip to boundaries
         rt_lines = rt_lines.overlay(boundaries_latlon, how='intersection')
         rt_stns = rt_stns.overlay(boundaries_latlon, how='intersection')
@@ -403,6 +547,7 @@ def spatial_analysis(boundaries,
             quilt_protectedbike = gpd.GeoDataFrame(geometry=[], crs=utm_crs)
     
     
+    # make patches
     patches, unbuffered_patches = make_patches(boundaries_latlon, utm_crs, patch_length=patch_length)
     unbuffered_patches_utm = unbuffered_patches.to_crs(utm_crs)
     if debug:
@@ -411,34 +556,45 @@ def spatial_analysis(boundaries,
     patch_times = []
     if len(to_test) > 0 and to_test != ["blocks"]:
         for p_idx in patches.index:
+            # p_idx = 0
             patch = patches.loc[p_idx, 'geometry']
             unbuffered_patch = unbuffered_patches.loc[p_idx, 'geometry']
             unbuffered_patch_utm = unbuffered_patches_utm.loc[p_idx, 'geometry']
             try:
                 patch_start = datetime.datetime.now()
-                for cleanupfile in ['pathbounds.geojson',
-                                    'pathbounds.poly',
+                for cleanupfile in ['patchbounds.geojson',
+                                    'patchbounds.poly',
                                     'patch.osm', 
                                     'allhwyspatch.osm']:
-                    if os.path.exists('temp/'+cleanupfile):
-                        os.remove('temp/'+cleanupfile)
+                                      # cleanupfile = 'pathbounds.geojson'
+                    if os.path.exists(f'{folder_name}temp/'+cleanupfile):
+                        os.remove(f'{folder_name}temp/'+cleanupfile)
                 
                 patchgdf = gpd.GeoDataFrame(geometry=[patch], crs=4326)
                 
-                patchgdf.to_file('temp/patchbounds.geojson', driver='GeoJSON')
-                subprocess.run('python ogr2poly/ogr2poly.py temp/patchbounds.geojson > temp/patchbounds.poly', shell=True, check=True)
+                patchgdf.to_file(f'{folder_name}temp/patchbounds.geojson', driver='GeoJSON')
+                subprocess.run(f'python ogr2poly/ogr2poly.py {folder_name}temp/patchbounds.geojson > {folder_name}temp/patchbounds.poly', shell=True, check=True)
+                time.sleep(5) # Sleep for 3 seconds
                 
                 #get data
                 try:
+                    # clip osm data to the patch boundaries?
                     subprocess.check_call(['osmconvert',
-                                           str(folder_name)+'temp/cityhighways.osm',
-                                           "-B=temp/patchbounds.poly",
-                                           #'--complete-ways',  #was commented
+                                           os.path.join(folder_name, f'temp/cityhighways_{current_year}.osm'),
+                                           f'-B={folder_name}temp/patchbounds.poly',
                                            '--drop-broken-refs',  #was uncommented
-                                           '-o=temp/patch_allroads.osm'])
-                    G_allroads_unsimplified = ox.graph_from_xml('temp/patch_allroads.osm', simplify=False, retain_all=True)
-                    os.remove('temp/patch_allroads.osm')
+                                           '--complete-ways',
+                                           # '--complete-multipolygons',
+                                           f'-o={folder_name}temp/patch_allroads.osm'])
+                                           
+                    # subprocess.check_call('osmosis --read-xml file="cities_out/ghsl_region_2007/temp/cityhighways.osm" --bounding-polygon file="cities_out/ghsl_region_2007/temp/patchbounds.poly" --write-xml file="cities_out/ghsl_region_2007/temp/patch_allroads.osm"')
+                    # subprocess.check_call('osmosis --read-xml file="cities_out/ghsl_region_2007/temp/cityhighways.osm"')
                     
+                    # !!!!!!!!!!!!
+                    # AQUI QUE TALVEZ ESTEJA DEMORANDO DEMAIS!!!
+                    print('Creating graph..')
+                    G_allroads_unsimplified = ox.graph_from_xml(f'{folder_name}temp/patch_allroads.osm', simplify=False, retain_all=True)
+                    os.remove(f'{folder_name}temp/patch_allroads.osm')
                     
                     # TESTING using the same graph for everything. 
                     # A little more efficient, avoids some problems with cycleways
@@ -461,6 +617,7 @@ def spatial_analysis(boundaries,
                     #TODO either figure this out or make the patch more efficient somehow? idk
                     #I think right now it's getting EVERYTHING, not just highways. Except not highways that are abandoned :)
                     print ('TYPEERROR FROM CLIPPING PATCH', p_idx)
+                    os.remove(f'{folder_name}temp/patch_allroads.osm')
                     with open(str(folder_name)+"patcherrorlog.txt", "a") as patcherrorlog:
                         patcherrorlog.write('TYPEERROR FROM CLIPPING PATCH '+str(p_idx))
                     G_allroads_unsimplified = ox.graph_from_polygon(patch, 
@@ -473,6 +630,7 @@ def spatial_analysis(boundaries,
                     #TODO either figure this out or make the patch more efficient somehow? idk
                     #I think right now it's getting EVERYTHING, not just highways. Except not highways that are abandoned :)
                     print ('ValueError FROM CLIPPING PATCH', p_idx)
+                    os.remove(f'{folder_name}temp/patch_allroads.osm')
                     with open(str(folder_name)+"patcherrorlog.txt", "a") as patcherrorlog:
                         patcherrorlog.write('ValueError FROM CLIPPING PATCH '+str(p_idx))
                     try:
@@ -486,131 +644,47 @@ def spatial_analysis(boundaries,
                 #label links that are not in tunnels
                 #so highway identification works properly later
                 #
+                print('Filtering graph..')
                 for x in G_allroads_unsimplified.edges:
                     if 'tunnel' not in G_allroads_unsimplified.edges[x].keys():
                         G_allroads_unsimplified.edges[x]['tunnel'] = "no" 
                         
                 #then simplify
                 G_allroads = ox.simplify_graph(G_allroads_unsimplified)
-                os.remove('temp/patchbounds.poly')
                         
+                # remove something?
                 G_allroads.remove_nodes_from(list(nx.isolates(G_allroads)))
                 
+                # reproject
+                print('Reprojecting graph..')
                 if len(G_allroads.edges) > 0 and len(G_allroads.nodes) > 0:
                     G_allroads = ox.project_graph(G_allroads, to_crs=utm_crs)
-                    
-                    center_nodes = {}
-                    if 'pnab' in to_test or 'pnpb' in to_test:
-                        ways_gdf = ox.graph_to_gdfs(G_allroads, nodes=False)
-                        
-                        for col in ['highway','cycleway','bicycle','cycleway:left','cycleway:right','cycleway:both']:
-                            if not col in ways_gdf.columns:
-                                ways_gdf[col] = ''
-                                
-                        tagged_cycleways = ways_gdf[(ways_gdf['highway'] == 'cycleway')]
-                        cycle_paths = ways_gdf[(ways_gdf['highway'] == 'path') & (ways_gdf['bicycle'] == 'designated')]
-                        on_street_tracks = ways_gdf[(ways_gdf['cycleway:right'] == 'track') |
-                                                       (ways_gdf['cycleway:left'] == 'track') |
-                                                       (ways_gdf['cycleway:both'] == 'track') |
-                                                       (ways_gdf['cycleway'] == 'track') |
-                                                       (ways_gdf['cycleway:right'] == 'opposite_track') |
-                                                        (ways_gdf['cycleway:left'] == 'opposite_track') |
-                                                        (ways_gdf['cycleway:both'] == 'opposite_track') |
-                                                        (ways_gdf['cycleway'] == 'opposite_track')
-                                                       ]
-                        on_street_lanes = ways_gdf[(ways_gdf['cycleway:right'] == 'lane') |
-                                                       (ways_gdf['cycleway:left'] == 'lane') |
-                                                       (ways_gdf['cycleway:both'] == 'lane') |
-                                                       (ways_gdf['cycleway'] == 'lane')]
-                        
-                        total_protectedbike = pd.concat([tagged_cycleways, cycle_paths, on_street_tracks])
-                        total_allbike = pd.concat([total_protectedbike, on_street_lanes])
-                        
-                        
-                        # exclude tiny, unconnected segments that aren't near larger ones
-                        max_jump = 300
-                        min_radius = 1000
-                        
-                        #remove isolated small lanes from protected network
-                        total_protectedbike['in_real_network'] = "unknown"
-                        for idx in total_protectedbike.index:
-                            already_identified = total_protectedbike.loc[idx,'in_real_network'] == "unknown"
-                            if type(already_identified).__name__ == 'Series':
-                                already_identified = already_identified.any()
-                            if already_identified:
-                                connected_indices = [idx]
-                                if shapely.minimum_bounding_radius(total_protectedbike.loc[connected_indices,'geometry'].unary_union) > min_radius:
-                                    total_protectedbike.loc[connected_indices,'in_real_network'] = "yes"
-                                else:
-                                    for i in range(0,10): #just so we don't end up in an infinite loop somehow
-                                        connected_network = total_protectedbike.loc[connected_indices,'geometry'].unary_union
-                                        nearby = total_protectedbike[total_protectedbike.distance(connected_network) < max_jump]
-                                        if 'yes' in nearby.in_real_network.unique():
-                                            total_protectedbike.loc[connected_indices,'in_real_network'] = "yes"
-                                            break
-                                        if set(connected_indices) == set(nearby.index):
-                                            if shapely.minimum_bounding_radius(total_protectedbike.loc[connected_indices,'geometry'].unary_union) > min_radius:
-                                                total_protectedbike.loc[connected_indices,'in_real_network'] = "yes"
-                                            else:
-                                                total_protectedbike.loc[connected_indices,'in_real_network'] = "no"
-                                            break
-                                        else:
-                                            connected_indices = list(nearby.index)
-                                    if shapely.minimum_bounding_radius(total_protectedbike.loc[connected_indices,'geometry'].unary_union) > min_radius:
-                                        total_protectedbike.loc[connected_indices,'in_real_network'] = "yes"
-                        total_protectedbike = total_protectedbike[total_protectedbike.in_real_network == "yes"]
-                        
-                        #remove isolated small lanes from allbike network
-                        total_allbike['in_real_network'] = "unknown"
-                        for idx in total_allbike.index:
-                            already_identified = total_allbike.loc[idx,'in_real_network'] == "unknown"
-                            if type(already_identified).__name__ == 'Series':
-                                already_identified = already_identified.any()
-                            if already_identified:
-                                connected_indices = [idx]
-                                if shapely.minimum_bounding_radius(total_allbike.loc[connected_indices,'geometry'].unary_union) > min_radius:
-                                    total_allbike.loc[connected_indices,'in_real_network'] = "yes"
-                                else:
-                                    for i in range(0,10): #just so we don't end up in an infinite loop somehow
-                                        connected_network = total_allbike.loc[connected_indices,'geometry'].unary_union
-                                        nearby = total_allbike[total_allbike.distance(connected_network) < max_jump]
-                                        if 'yes' in nearby.in_real_network.unique():
-                                            total_allbike.loc[connected_indices,'in_real_network'] = "yes"
-                                            break
-                                        if set(connected_indices) == set(nearby.index):
-                                            if shapely.minimum_bounding_radius(total_allbike.loc[connected_indices,'geometry'].unary_union) > min_radius:
-                                                total_allbike.loc[connected_indices,'in_real_network'] = "yes"
-                                            else:
-                                                total_allbike.loc[connected_indices,'in_real_network'] = "no"
-                                            break
-                                        else:
-                                            connected_indices = list(nearby.index)
-                                    if shapely.minimum_bounding_radius(total_allbike.loc[connected_indices,'geometry'].unary_union) > min_radius:
-                                        total_allbike.loc[connected_indices,'in_real_network'] = "yes"
-                        total_allbike = total_allbike[total_allbike.in_real_network == "yes"]
-                                
-                        quilt_allbike = pd.concat([quilt_allbike, total_allbike])
-                        quilt_protectedbike = pd.concat([quilt_protectedbike, total_protectedbike])
-                        
-                        center_nodes['pnpb'] = set()
-                        center_nodes['pnab'] = set()
-                        for edge in total_protectedbike.index:
-                            center_nodes['pnpb'].add(edge[0])
-                            center_nodes['pnpb'].add(edge[1])
-                        for edge in total_allbike.index:
-                            center_nodes['pnab'].add(edge[0])
-                            center_nodes['pnab'].add(edge[1])
+                    # export?
+                    # ox.save_graphml(G_allroads, 'teste_kaue/sp_graph_test.graphml')
                     
                     
-                    if 'highways' in to_test:
-                        highway_lines_gdf_ll = get_highways(G_allroads)
-                        # highway_lines_gdf_ll = get_service_locations.get_highways(G_allroads)
-                        if highway_lines_gdf_ll is not None and len(list(highway_lines_gdf_ll.geometry)) > 0:
-                            all_highway_lines += list(highway_lines_gdf_ll.geometry)
-                            highway_lines_utm = ox.project_gdf(highway_lines_gdf_ll)
-                            highway_areas_utm = highway_lines_utm.buffer(distances['highways'])
-                            highway_areas_ll = highway_areas_utm.to_crs(4326)
-                            all_highway_areas +=list(highway_areas_ll.geometry)
+                # transform the network to gdfs: will be neccesary for process_bike, get_highways and blocks
+                print("Transforming network to GDF")
+                nodes, edges = ox.graph_to_gdfs(G_allroads)
+                    
+                center_nodes = {}
+                if 'pnab' in to_test or 'pnpb' in to_test:
+                  print("Processing pnab/pnpb")
+                  quilt_allbike, quilt_protectedbike, center_nodes = process_bike(edges, quilt_allbike, quilt_protectedbike, center_nodes) 
+                    
+                    
+                if 'highways' in to_test:
+                    print("Processing highways...")
+                    # SLOW HERE !!!!!!!!!!!!
+                    highway_lines_gdf_ll = get_highways(nodes, edges)
+                    # highway_lines_gdf_ll = get_service_locations.get_highways(G_allroads)
+                    if highway_lines_gdf_ll is not None and len(list(highway_lines_gdf_ll.geometry)) > 0:
+                        all_highway_lines += list(highway_lines_gdf_ll.geometry)
+                        highway_lines_utm = ox.project_gdf(highway_lines_gdf_ll)
+                        highway_areas_utm = highway_lines_utm.buffer(distances['highways'])
+                        highway_areas_ll = highway_areas_utm.to_crs(4326)
+                        all_highway_areas +=list(highway_areas_ll.geometry)
+                
                         
                     # if debug:
                     #     for node, data in G.nodes(data=True):
@@ -618,114 +692,146 @@ def spatial_analysis(boundaries,
                     #             data['osmid_original'] = data.pop('osmid')
                     #     ox.io.save_graph_geopackage(G, f'{folder_name}debug/{p_idx}_graph.gpkg')
                         
-                    for service in service_point_locations.keys():
-                        if service in ['healthcare','schools','libraries','bikeshare','pnft','special']:
-                            patch_points = service_point_locations[service].intersection(patch)
-                            patch_points.crs=4326
-                            patch_points_utm = patch_points.to_crs(utm_crs)
-                            patch_points_utm = patch_points_utm[(~patch_points_utm.is_empty)
-                                                                &(patch_points_utm.geometry!=None)]
-                            if len(patch_points) > 0:
-                                center_nodes[service]  = ox.distance.nearest_nodes(
-                                    G_allroads, 
-                                    patch_points_utm.geometry.x, 
-                                    patch_points_utm.geometry.y,
-                                    return_dist=False)
+                print("Extracting nodes...")        
+                for service in service_point_locations.keys():
+                    if service in ['healthcare','schools','libraries','bikeshare','pnft','special']:
+                      # service = 'schools'
+                      # crop the points (schools hospitals etc) to the patch boundaries?
+                        patch_points = service_point_locations[service].intersection(patch)
+                        patch_points.crs=4326
+                        patch_points_utm = patch_points.to_crs(utm_crs)
+                        patch_points_utm = patch_points_utm[(~patch_points_utm.is_empty)
+                                                            &(patch_points_utm.geometry!=None)]
+                        if len(patch_points) > 0:
+                            center_nodes[service]  = ox.distance.nearest_nodes(
+                                G_allroads, 
+                                patch_points_utm.geometry.x, 
+                                patch_points_utm.geometry.y,
+                                return_dist=False)
                     # if debug:
                     #     with open(f'{folder_name}debug/{p_idx}_centernodes.json', "w") as i :
                     #         json.dump(center_nodes, i)
                     
                     
-                    isochrone_polys = {}
-                    failures = {}
-                    for service in to_test:
-                        failures[service] = 0
-                        if 'pnab' in to_test or 'pnpb' in to_test:
-                            failures['pnab']=0
-                            failures['pnpb']=0
+                isochrone_polys = {}
+                failures = {}
+                for service in to_test:
+                    failures[service] = 0
+                    if 'pnab' in to_test or 'pnpb' in to_test:
+                        failures['pnab']=0
+                        failures['pnpb']=0
                     
-                    # Get polygons
-                    for service in testing_services:
-                        if service in center_nodes.keys():
-                            print(f'getting polygons for {service}, {len(center_nodes[service])} center_nodes')
-                            isochrone_polys[service] = proper_iso_polys(
-                            # isochrone_polys[service] = isochrones.proper_iso_polys(
-                                G_allroads, 
-                                center_nodes[service],
-                                distance=distances[service],                                           
-                                buffer=buffer_dist, 
-                                infill=2500)       
+                # Get polygons - isocrhones?
+                for service in testing_services:
+                    if service in center_nodes.keys():
+                      if service in ['pnab', 'pnpb']:
+                        # service = 'pnab'
+                        print(f'getting polygons for {service}, {len(center_nodes[service])} center_nodes')
                         
-                    for service in isochrone_polys.keys():
-                        if service not in quilt_isochrone_polys.keys() or not quilt_isochrone_polys[service]:
-                            quilt_isochrone_polys[service] = isochrone_polys[service]
-                        elif isochrone_polys[service]:
-                            quilt_isochrone_polys[service] = shapely.ops.unary_union([quilt_isochrone_polys[service],isochrone_polys[service]])
-                        if debug == True:
-                            if not os.path.exists(f'{folder_name}debug/patch{p_idx}'):
-                                os.makedirs(f'{folder_name}debug/patch{p_idx}')
-                            gpd.GeoSeries([isochrone_polys[service]], crs=utm_crs).to_crs(4326).to_file(f'{folder_name}debug/patch{p_idx}/{service}_latlon.geojson', driver='GeoJSON')
-                    
-                    #get polygons for rapid transit
-                    if 'pnrt' in to_test:
-                        for stn_idx in rt_stns.index:
-                            if unbuffered_patch.contains(rt_stns.loc[stn_idx, 'geometry']):
-                                stn_utm = rt_stns_utm.loc[stn_idx, 'geometry']
-                                center_node = ox.distance.nearest_nodes(
-                                    G_allroads, 
-                                    stn_utm.x, 
-                                    stn_utm.y,
-                                    return_dist=False)
-                                iso_poly = proper_iso_polys(
-                                    G_allroads, 
-                                    [center_node],
-                                    distance=distances['pnrt'],                                           
-                                    buffer=buffer_dist, 
-                                    infill=2500)
-                                rt_isochrones_utm.loc[stn_idx,'geometry'] = iso_poly
-                    
-                    if 'blocks' in to_test:
-                        if G_allroads and len(G_allroads.edges) > 0:
+                        # gdf = proper_iso_polys(
+                        isochrone_polys[service] = proper_iso_polys(
+                            G_allroads, 
+                            center_nodes[service],
+                            distance=distances[service],                                           
+                            buffer=buffer_dist, 
+                            infill=2500)
+                        
+                        # gdf_pnpb = gdf[gdf["id"].isin(center_nodes["pnpb"])]
+                        # isochrone_polys["pnpb"] =  unary_union(gdf_pnpb["geometry"])
+                        # isochrone_polys["pnab"] =  unary_union(gdf["geometry"])
+                        
+                        
+                      else:
+                        # service = 'pnab'
+                        print(f'getting polygons for {service}, {len(center_nodes[service])} center_nodes')
+                        
+                        # gdf = proper_iso_polys(
+                        isochrone_polys[service] = proper_iso_polys(
+                            G_allroads, 
+                            center_nodes[service],
+                            distance=distances[service],                                           
+                            buffer=buffer_dist, 
+                            infill=2500)
                             
-                            streets = ox.utils_graph.graph_to_gdfs(G_allroads, nodes = False)
-                            streets = shapely.geometry.MultiLineString(list(streets.geometry))
-                            merged = shapely.ops.linemerge(streets)
-                            if merged:
-                                borders = shapely.ops.unary_union(merged)
-                                blocks = list(shapely.ops.polygonize(borders))
-                                all_blocks = []
-                                selected_areas = []
-                                for block in blocks:
-                                    if 500 < block.area: #< 200000000:
-                                        if block.interiors:
-                                            block = shapely.geometry.Polygon(block.exterior)
-                                        if block.centroid.within(unbuffered_patch_utm):
-                                            area = round(block.area, 3)
-                                            perim = round(block.length, 3)
-                                            lemgth = round((perim * perim) / area, 3)
-                                            if blocks_simplification:
-                                                block = block.simplify(blocks_simplification)
-                                            all_blocks.append((block, area, perim, lemgth))
-                                            if (lemgth > 75) and (1000 > area or area > 1000000): #obvious outliers
-                                                pass
-                                            elif (lemgth > 30 ) and (3000 > area):
-                                                pass
-                                            else:
-                                                selected_areas.append(area)
-                                outblocks += all_blocks
-                                print(f'cut {len(all_blocks)} blocks')
-                                block_counts.append(len(all_blocks))
-                            else:
-                                block_counts.append(0)
-                                print('not merged!')
+                        # isochrone_polys[service] = unary_union(gdf["geometry"])
+
+                        
+                for service in isochrone_polys.keys():
+                    if service not in quilt_isochrone_polys.keys() or not quilt_isochrone_polys[service]:
+                        quilt_isochrone_polys[service] = isochrone_polys[service]
+                    elif isochrone_polys[service]:
+                        quilt_isochrone_polys[service] = shapely.ops.unary_union([quilt_isochrone_polys[service],isochrone_polys[service]])
+                    if debug == True:
+                        if not os.path.exists(f'{folder_name}debug/patch{p_idx}'):
+                            os.makedirs(f'{folder_name}debug/patch{p_idx}')
+                        gpd.GeoSeries([isochrone_polys[service]], crs=utm_crs).to_crs(4326).to_file(f'{folder_name}debug/patch{p_idx}/{service}_latlon.geojson', driver='GeoJSON')
+                    
+                #get polygons for rapid transit
+                if 'pnrt' in to_test:
+                    for stn_idx in rt_stns.index:
+                        if unbuffered_patch.contains(rt_stns.loc[stn_idx, 'geometry']):
+                            print(f'getting polygons for pnrt')
+                            stn_utm = rt_stns_utm.loc[stn_idx, 'geometry']
+                            center_node = ox.distance.nearest_nodes(
+                                G_allroads, 
+                                stn_utm.x, 
+                                stn_utm.y,
+                                return_dist=False)
+                            iso_poly = proper_iso_polys(
+                                G_allroads, 
+                                [center_node],
+                                distance=distances['pnrt'],                                           
+                                buffer=buffer_dist, 
+                                infill=2500)
+                            rt_isochrones_utm.loc[stn_idx,'geometry'] = iso_poly
+                
+                if 'blocks' in to_test:
+                    if G_allroads and len(G_allroads.edges) > 0:
+                        
+                        streets = edges
+                        streets = shapely.geometry.MultiLineString(list(streets.geometry))
+                        merged = shapely.ops.linemerge(streets)
+                        if merged:
+                            borders = shapely.ops.unary_union(merged)
+                            blocks = list(shapely.ops.polygonize(borders))
+                            all_blocks = []
+                            selected_areas = []
+                            for block in blocks:
+                                if 500 < block.area: #< 200000000:
+                                    if block.interiors:
+                                        block = shapely.geometry.Polygon(block.exterior)
+                                    if block.centroid.within(unbuffered_patch_utm):
+                                        area = round(block.area, 3)
+                                        perim = round(block.length, 3)
+                                        lemgth = round((perim * perim) / area, 3)
+                                        if blocks_simplification:
+                                            block = block.simplify(blocks_simplification)
+                                        all_blocks.append((block, area, perim, lemgth))
+                                        if (lemgth > 75) and (1000 > area or area > 1000000): #obvious outliers
+                                            pass
+                                        elif (lemgth > 30 ) and (3000 > area):
+                                            pass
+                                        else:
+                                            selected_areas.append(area)
+                            outblocks += all_blocks
+                            print(f'cut {len(all_blocks)} blocks')
+                            block_counts.append(len(all_blocks))
                         else:
                             block_counts.append(0)
-                    
-                    #import pdb;pdb.set_trace()
-                    patch_time = datetime.datetime.now() - patch_start
+                            print('not merged!')
+                    else:
+                        block_counts.append(0)
                         
-                    print(f"finished patch #{p_idx+1} out of {len(patches)} for {name} {id_code} in {patch_time}")
-                    patch_times.append(patch_time)
+                    
+                del G_allroads_unsimplified
+                del G_allroads
+                gc.collect()
+                    
+                #import pdb;pdb.set_trace()
+                patch_time = datetime.datetime.now() - patch_start
+                    
+                print(f"finished patch #{p_idx+1} out of {len(patches)} for {name} {id_code} in {patch_time}")
+                patch_times.append(patch_time)
             except ox._errors.InsufficientResponseError:
                 print('InsufficientResponseError')
                 pass
@@ -743,10 +849,7 @@ def spatial_analysis(boundaries,
             patches.times = patch_times
             patches.to_file(folder_name+'debug/patches_with_times.geojson', driver='GeoJSON')
             pd.DataFrame({'failures':failures}).to_csv(folder_name+'debug/failures.csv')
-    
-    del G_allroads_unsimplified
-    del G_allroads
-    gc.collect()
+
     
     debugcounter = 1
     print(debugcounter); debugcounter+=1

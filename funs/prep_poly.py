@@ -48,6 +48,7 @@ def prep_from_poly(hdc, poly, folder_name, boundary_buffer = 500, current_year =
 
     file_dir = [f for f in os.listdir(directory) if re.search(f"{country_to_open}_{current_year}", f)]
     file_dir = [os.path.join(directory, f) for f in file_dir]
+    file_dir = ''.join(str(x) for x in file_dir)
     
     # file_dir = f"input_data/pbf/{current_year}/{country_to_open}_{current_year}.osm.pbf"
     

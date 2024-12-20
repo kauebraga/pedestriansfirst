@@ -26,11 +26,11 @@ from shapely.ops import unary_union, transform
 import shapely.ops
 import topojson
 
-from  frame1.isochrones import *
-from  frame1.get_service_locations import *
-from  frame1.gtfs_parser import *
-from  frame1.prep_bike_osm import *
-from  frame1.prep_pop_ghsl import *
+from  funs.isochrones import *
+from  funs.get_service_locations import *
+from  funs.gtfs_parser import *
+from  funs.prep_bike_osm import *
+from  funs.prep_pop_ghsl import *
 # import access
 #import summarize_ttm
 

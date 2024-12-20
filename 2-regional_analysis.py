@@ -1,7 +1,7 @@
 import warnings
 warnings.simplefilter(action = "ignore", category = FutureWarning)
 
-from funs.pedestriansfirst_mod import *
+from funs.pedestriansfirst import *
 from funs.get_jurisdictions import get_jurisdictions
 from funs.get_number_jurisdictions import *
 from funs.prep_poly import *
@@ -35,18 +35,18 @@ import csv
 
 import pdb
 
-import funs.pedestriansfirst_mod
+import funs.pedestriansfirst
 
 # hdc = 11480
 # hdc = 2007 # los angeles
 # hdc = "08154" # fortaleza
-# hdc = 7277 # sao paulo
+# hdc = "07277" # sao paulo
 # hdc = 40
 # hdc = 8099 # new york
 
 
 # folder_prefix = 'cities_out'
-# current_year=2024
+# current_year=2025
 # minimum_portion=0.6
 
 
@@ -114,7 +114,7 @@ def regional_analysis(hdc, folder_prefix = 'cities_out', minimum_portion=0.6, pr
         gpd.GeoDataFrame(geometry=[total_poly_latlon], crs=4326).to_file(f'{folder_name}/debug/area_for_osm_extract.gpkg', driver='GPKG')
         
         start = timeit.default_timer()
-        prep_from_poly(hdc, total_poly_latlon, folder_name, boundary_buffer = 2000)
+        prep_from_poly(hdc, total_poly_latlon, folder_name, boundary_buffer = 2000, current_year=current_year)
         stop = timeit.default_timer()
         print('Time prep: ', stop - start)  
     
@@ -126,6 +126,7 @@ def regional_analysis(hdc, folder_prefix = 'cities_out', minimum_portion=0.6, pr
             hdc,
             analysis_areas.loc[0,'name'],
             folder_name=folder_name,
+            current_year = current_year,
             to_test = [    'healthcare',
                            'schools',
                            'h+s',

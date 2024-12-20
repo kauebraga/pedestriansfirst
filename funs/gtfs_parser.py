@@ -21,7 +21,7 @@ from shapely.geometry import Point
 
 from zipfile import ZipFile
 
-from frame1.get_jurisdictions import get_jurisdictions
+from funs.get_jurisdictions import get_jurisdictions
 
 def feed_from_filename(filename):
     
@@ -112,17 +112,18 @@ def get_stop_frequencies(feed, headwaylim, folder_name, filename):
         log(folder_name,"counts.empty,"+feed.agency.agency_name[0]+"\n")
     return counts
     
-def get_frequent_stops(hdc, folder_name, headwaylim = 20):
+def get_frequent_stops(hdc, year, folder_name, headwaylim = 20):
     # filenames = get_GTFS_from_mobility_database(poly, folder_name+'temp/gtfs/')
     directory = f"input_data/gtfs/{year}"    
 
     filenames = [f for f in os.listdir(directory) if re.search(f"gtfs_{hdc}", f)]
     filenames = [os.path.join(directory, f) for f in filenames]
+    # filenames = ''.join(str(x) for x in filenames)
     
     all_freq_stops = gpd.GeoDataFrame(geometry=[], crs=4326)
     wednesdays = []
     for filename in filenames:
-        # filename = filenames[1]
+        # filename = filenames[0]
         try:
             feed = feed_from_filename(filename)
             counts = get_stop_frequencies(feed, headwaylim, folder_name, filename)
