@@ -21,43 +21,10 @@ from shapely.geometry import Point
 
 from zipfile import ZipFile
 
-def get_GTFS_from_mobility_database(poly, gtfs_data_dir, sources_loc='input_data/sources.csv'):
-    if not os.path.exists(sources_loc):
-        url = 'https://bit.ly/catalogs-csv'
-        r = requests.get(url, allow_redirects=True)  # to get content after redirection
-        with open(sources_loc, 'wb') as f:
-            f.write(r.content)
-    if not os.path.exists(gtfs_data_dir):
-        os.mkdir(gtfs_data_dir)
-    sources = gpd.read_file(sources_loc)
-    filenames = []
-    for idx in list(sources.index):
-        if not sources.loc[idx,'location.bounding_box.minimum_longitude'] == '':
-            sources.loc[idx,'geometry'] = shapely.geometry.box(
-                float(sources.loc[idx,'location.bounding_box.minimum_longitude']),
-                float(sources.loc[idx,'location.bounding_box.minimum_latitude']),
-                float(sources.loc[idx,'location.bounding_box.maximum_longitude']),
-                float(sources.loc[idx,'location.bounding_box.maximum_latitude']),
-                )
-            if sources.loc[idx,'geometry'].intersects(poly):
-                overlap = sources.loc[idx,'geometry'].intersection(poly)
-                if overlap.area * 1000 > sources.loc[idx,'geometry'].area:
-                    url = sources.loc[idx,'urls.latest']
-                    name = str(idx)+sources.loc[idx,'provider']
-                    if sources.loc[idx,'name'] != '':
-                        name = name+'_'+ sources.loc[idx,'name']
-                    name = name.translate(str.maketrans('', '', string.punctuation))
-                    name = name[:50]
-                    name = name.replace(' ','_')
-                    if name != '' and url != '':
-                        filename=gtfs_data_dir+name+'.zip'
-                        filenames.append(filename)
-                        r = requests.get(url, allow_redirects=True)  # to get content after redirection
-                        with open(filename, 'wb') as f:
-                            f.write(r.content)
-    return filenames
+from frame1.get_jurisdictions import get_jurisdictions
 
 def feed_from_filename(filename):
+    
     try:
         if not os.path.isdir('temp_gtfs_dir/'):
             os.mkdir('temp_gtfs_dir/')
@@ -145,11 +112,17 @@ def get_stop_frequencies(feed, headwaylim, folder_name, filename):
         log(folder_name,"counts.empty,"+feed.agency.agency_name[0]+"\n")
     return counts
     
-def get_frequent_stops(poly, folder_name, headwaylim = 20):
-    filenames = get_GTFS_from_mobility_database(poly, folder_name+'temp/gtfs/')
+def get_frequent_stops(hdc, folder_name, headwaylim = 20):
+    # filenames = get_GTFS_from_mobility_database(poly, folder_name+'temp/gtfs/')
+    directory = f"input_data/gtfs/{year}"    
+
+    filenames = [f for f in os.listdir(directory) if re.search(f"gtfs_{hdc}", f)]
+    filenames = [os.path.join(directory, f) for f in filenames]
+    
     all_freq_stops = gpd.GeoDataFrame(geometry=[], crs=4326)
     wednesdays = []
     for filename in filenames:
+        # filename = filenames[1]
         try:
             feed = feed_from_filename(filename)
             counts = get_stop_frequencies(feed, headwaylim, folder_name, filename)
