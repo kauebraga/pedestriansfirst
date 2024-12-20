@@ -1,11 +1,11 @@
 import warnings
 warnings.simplefilter(action = "ignore", category = FutureWarning)
 
-from frame1.pedestriansfirst_mod import *
-from frame1.get_jurisdictions import get_jurisdictions
-from frame1.get_number_jurisdictions import *
-from frame1.prep_poly import *
-from frame1.process_bike_new import process_bike
+from funs.pedestriansfirst_mod import *
+from funs.get_jurisdictions import get_jurisdictions
+from funs.get_number_jurisdictions import *
+from funs.prep_poly import *
+from funs.process_bike_new import process_bike
 import subprocess
 import os
 import os.path
@@ -35,7 +35,7 @@ import csv
 
 import pdb
 
-import frame1.pedestriansfirst_mod
+import funs.pedestriansfirst_mod
 
 # hdc = 11480
 # hdc = 2007 # los angeles
