@@ -29,6 +29,7 @@ import sys
 import pdb
 
 # hdc = "08099" # new york
+# hdc = "00507" # tijuana
 
 def get_jurisdictions(hdc,
                       minimum_portion = 0.5, #portion of a jurisdiction that has to be within the poly
@@ -109,6 +110,8 @@ def get_jurisdictions(hdc,
     country_overlaps = country_bounds.overlay(poly_ll_gdf, how='intersection')
     country_overlaps['land_area'] = country_overlaps.to_crs(poly_utm_gdf.crs).area
     main_country = country_overlaps.sort_values('land_area', ascending=False).iloc[0]['shapeGroup']
+    # only filter the country with the largest intersection
+    country_overlaps = country_overlaps.loc[country_overlaps['shapeGroup'] == main_country]
     
     # we create analysis areas for "the portion of an agglomeration within each 
     # country
@@ -118,6 +121,7 @@ def get_jurisdictions(hdc,
     analysis_areas.loc[0, 'agglomeration_country_name'] = agglomeration_country_name
 
     # add country-specific analysis areas
+    # I will comment because I don't need this anymore!
     for idx in country_overlaps.index:
         analysis_areas.loc[new_id,'country'] = country_overlaps.loc[idx,'shapeGroup']
         analysis_areas.loc[:,'geometry'].loc[new_id] = country_overlaps.loc[idx,'geometry']

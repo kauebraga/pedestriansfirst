@@ -247,7 +247,7 @@ print('Time final: ', stop - start)
 
 
 # sp
-hdc = "07277"
+hdc = "00507"
 shutil.rmtree(f'cities_out/ghsl_region_{hdc}')
 start = timeit.default_timer()
 regional_analysis(hdc = hdc, analyze=True, summarize=True)
@@ -332,6 +332,7 @@ for hdc in hdcs_run[65:95]:
                     
 # regional_analysis(hdc = "01156", analyze=True, to_test = ['pnft'], summarize = True, current_year=2024, prep = False, jurisdictions=False)
 # regional_analysis(hdc = "05472", analyze=False, to_test = ['pnft'], summarize = True, current_year=2024, prep = False, jurisdictions=False)
+regional_analysis(hdc = "00507", analyse=False, to_test = [], summarize = True, current_year=2024, prep = False, jurisdictions=True)
 
 # run other cities (from ITDP ) too
 # or no?
