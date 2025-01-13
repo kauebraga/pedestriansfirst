@@ -5,7 +5,7 @@ from funs.pedestriansfirst import *
 from funs.get_jurisdictions import get_jurisdictions
 from funs.get_number_jurisdictions import *
 from funs.prep_poly import *
-from funs.process_bike_new import process_bike
+# from funs.process_bike_new import process_bike
 import subprocess
 import os
 import os.path
@@ -31,26 +31,54 @@ import pdb
 import timeit
 import csv
 
+import subprocess
+import os
+import os.path
+import json
+import shutil
+import geojson
+import shapely
+import datetime
+from shapely.geometry import LineString, Polygon, shape, mapping
+from shapely.ops import unary_union
+import geopandas as gpd
+import topojson
+import pandas as pd
+import numpy as np
+import math
+import osmnx as ox
+import warnings
+import urllib
+import zipfile
+from tqdm import tqdm
+import sys
+
+import pdb
+
 
 
 import pdb
 
 import funs.pedestriansfirst
+import re
+import funs.calculate_country_ind
+from funs.calculate_country_ind import *
 
 # hdc = 11480
-# hdc = 2007 # los angeles
+# hdc = "02007" # los angeles
 # hdc = "08154" # fortaleza
 # hdc = "07277" # sao paulo
 # hdc = 40
 # hdc = 8099 # new york
+# hdc = "01156" # trujillo
+# hdc = "05472" # jakarta
+# hdc = "05816" # london
 
 
-# folder_prefix = 'cities_out'
-# current_year=2025
-# minimum_portion=0.6
+# folder_prefix = 'cities_out'; current_year=2024; minimum_portion=0.6; hdc = "08154"
 
 
-def regional_analysis(hdc, folder_prefix = 'cities_out', minimum_portion=0.6, prep = True,analyze=True,summarize=True,simplification=0.001, current_year=2024):
+def regional_analysis(hdc, to_test, folder_prefix = 'cities_out', minimum_portion=0.6, prep = True, analyse=True,summarize=True,jurisdictions=True,simplification=0.001, current_year=2024, cleanup = False):
     """Run analysis scripts for a given region
     
     Uses lots (too many?) hardcoded defaults
@@ -95,64 +123,73 @@ def regional_analysis(hdc, folder_prefix = 'cities_out', minimum_portion=0.6, pr
     
     
     
-
-    analysis_areas = get_jurisdictions(
-        hdc, 
-        minimum_portion=minimum_portion
-        )
+    if jurisdictions == True:
+      analysis_areas = get_jurisdictions(
+          hdc, 
+          minimum_portion=minimum_portion
+          )
+      
+      analysis_areas.to_file(f'{folder_name}/debug/analysis_areas.gpkg', driver='GPKG')
+    else:
+      analysis_areas = gpd.read_file(f'{folder_name}/debug/analysis_areas.gpkg')    
+      
 
     
-    analysis_areas.to_file(f'{folder_name}/debug/analysis_areas.gpkg', driver='GPKG')
+    
+    #If we're going to do any access-based indicators
+    #Let's make sure to buffer this to include peripheral roads etc for routing
+    total_poly_latlon=analysis_areas.unary_union
+    total_poly_latlon = shapely.convex_hull(total_poly_latlon)   
+    # total_poly_latlon.to_file(f'{folder_name}/debug/boundary.gpkg', driver='GPKG')
+    gpd.GeoDataFrame(geometry=[total_poly_latlon], crs=4326).to_file(f'{folder_name}/debug/area_for_osm_extract.gpkg', driver='GPKG')
     
     #3) prepare OSM data files for the agglomeration
-    if prep:
-        #If we're going to do any access-based indicators
-        #Let's make sure to buffer this to include peripheral roads etc for routing
-        total_poly_latlon=analysis_areas.unary_union
-        total_poly_latlon = shapely.convex_hull(total_poly_latlon)   
-        # total_poly_latlon.to_file(f'{folder_name}/debug/boundary.gpkg', driver='GPKG')
-        gpd.GeoDataFrame(geometry=[total_poly_latlon], crs=4326).to_file(f'{folder_name}/debug/area_for_osm_extract.gpkg', driver='GPKG')
-        
-        start = timeit.default_timer()
-        prep_from_poly(hdc, total_poly_latlon, folder_name, boundary_buffer = 2000, current_year=current_year)
-        stop = timeit.default_timer()
-        print('Time prep: ', stop - start)  
+    if prep == True:
+      start = timeit.default_timer()
+      prep_from_poly(hdc, total_poly_latlon, folder_name, boundary_buffer = 2000, current_year=current_year)
+      stop = timeit.default_timer()
+      print('Time prep: ', stop - start)  
+    else:
+      print('Didnt prep')  
     
     #4) now actually call the functions and save the results
-    if analyze == True:
-        start = timeit.default_timer()
-        geospatial_calctime = spatial_analysis(
-            total_poly_latlon,
-            hdc,
-            analysis_areas.loc[0,'name'],
-            folder_name=folder_name,
-            current_year = current_year,
-            to_test = [    'healthcare',
-                           'schools',
-                           'h+s',
-                           #'libraries',
-                           'bikeshare',
-                           'carfree',
-                           'blocks',
-                           'density',
-                           'pnft', # VOLTAR PRO PADRAO!!!
-                           'pnrt',
-                           'pnpb', #protected bikeways
-                           'pnab', #all bikeways
-                           'pnst', #combo transit + bike
-                           'highways',
-                           ]
-            )
-        stop = timeit.default_timer()
-        print('Time analyze: ', stop - start)  
+    if analyse:
+      print("why?")
+      start = timeit.default_timer()
+      geospatial_calctime = spatial_analysis(
+          boundaries = total_poly_latlon,
+          id_code = hdc,
+          name = analysis_areas.loc[0,'name'],
+          folder_name=folder_name,
+          current_year = current_year,
+          to_test = to_test
+          # [    
+                         # 'healthcare',
+                         # 'schools',
+                         # 'h+s',
+                         # 'bikeshare',
+                         # 'carfree',
+                         # 'blocks',
+                         # 'density',
+                         # 'pnft', # VOLTAR PRO PADRAO!!!
+                         # 'pnrt',
+                         # 'pnpb', #protected bikeways
+                         # 'pnab', #all bikeways
+                         # 'pnst', #combo transit + bike
+                         # 'highways',
+                         # ]
+          )
+      stop = timeit.default_timer()
+      print('Time analyze: ', stop - start)  
     else:
-        geospatial_calctime = 0
+      print('Didnt analyze')  
+      geospatial_calctime = 0
     
     #5) calculate indicator measurement for each analysis area
     if summarize == True:
         start = datetime.datetime.now()
         calculate_indicators(
-            analysis_areas, 
+            analysis_areas = analysis_areas, 
             folder_name=folder_name,
             )
         end = datetime.datetime.now()
@@ -180,7 +217,7 @@ import shutil
 
 
 # ny
-hdc = 8099
+hdc = "08099"
 shutil.rmtree(f'cities_out/ghsl_region_{hdc}')
 start = timeit.default_timer()
 regional_analysis(hdc = hdc, analyze=True, summarize=True)
@@ -189,7 +226,7 @@ print('Time prep: ', stop - start)
 # Time prep:  3433.462432500004
 
 # los angeles
-hdc = 2007
+hdc = "02007"
 shutil.rmtree(f'cities_out/ghsl_region_{hdc}')
 start = timeit.default_timer()
 regional_analysis(hdc = hdc, analyze=True, summarize=True)
@@ -199,7 +236,18 @@ print('Time prep: ', stop - start)
 
 
 # fortaleza
-hdc = 8154
+hdc = "08154"
+shutil.rmtree(f'cities_out/ghsl_region_{hdc}')
+start = timeit.default_timer()
+regional_analysis(hdc = hdc, analyze=True, summarize=True)
+# old fortaleza
+# regional_analysis(hdc = 1397, analyze=True, summarize=True)
+stop = timeit.default_timer()
+print('Time final: ', stop - start)
+
+
+# sp
+hdc = "07277"
 shutil.rmtree(f'cities_out/ghsl_region_{hdc}')
 start = timeit.default_timer()
 regional_analysis(hdc = hdc, analyze=True, summarize=True)
@@ -210,40 +258,101 @@ print('Time final: ', stop - start)
 
 
 
+calculate_country_indicators()
 
-start = timeit.default_timer()
-regional_analysis(hdc = 1289, analyze=True, summarize=False) # sao paulo
-stop = timeit.default_timer()
-print('Time prep: ', stop - start)
-# round with standard patches: 1547 seconds
-# round with less patches: 1242.5084901670052
 
-start = timeit.default_timer()
-regional_analysis(hdc = 1910, analyze=True, summarize=False) # london
-stop = timeit.default_timer()
-print('Time prep: ', stop - start)
-# round with standard patches: 1547 seconds
-# round with less patches: 1242.5084901670052
 
-start = timeit.default_timer()
-regional_analysis(hdc = 5472, analyze=True, summarize=True) # jakarta
-stop = timeit.default_timer()
-print('Time prep: ', stop - start)
-# round with standard patches: 1679.7133335410035
 
-start = timeit.default_timer()
-regional_analysis(hdc = 39, analyze=True, summarize=True) # dakar
-stop = timeit.default_timer()
-print('Time prep: ', stop - start)
-# round with standard patches: 159.60618587501813 seconds
+# for 2024 - we are only running partially
+hdcs = pd.read_csv('input_data/hdc_to_run.csv', dtype={'hdc_new' : str})
 
-start = timeit.default_timer()
-regional_analysis(hdc = 1289, analyze=True, summarize=True) # lagos
-stop = timeit.default_timer()
-print('Time prep: ', stop - start)
-# round with standard patches: 204.60100545801106 seconds
+# 1) Run only the population data collection for the cities we already have data from the previous collection
+hdcs_notrun = hdcs[~hdcs['run_again']]
+hdcs_notrun = hdcs_notrun["hdc_new"].tolist()
 
-# all
+# regional_analysis(hdc = "08154", to_test = [], analyze=True, summarize=False, current_year=2024, prep = False, jurisdictions=False)
+
+
+for hdc in hdcs_notrun[850:1019]:
+  regional_analysis(hdc, to_test = [], analyze=True, summarize=False, jurisdictions=True, current_year=2024)
+
+
+# we need to recalculate PNRT for all --------
+hdcs_all = hdcs["hdc_new"].tolist()
+
+for hdc in hdcs_all:
+  regional_analysis(hdc, to_test = ['pnrt'], analyse=True, summarize=False, jurisdictions=False, current_year=2024, prep=False)
+  
+  
+from concurrent.futures import ThreadPoolExecutor
+
+def run_analysis(hdc):
+    return regional_analysis(
+        hdc,
+        to_test=['pnrt'],
+        analyse=True,
+        summarize=False,
+        jurisdictions=False,
+        current_year=2024,
+        prep=False,
+    )
+
+if __name__ == "__main__":
+    with ThreadPoolExecutor() as executor:
+        results = list(executor.map(run_analysis, hdcs_all))
+  
+
+# AFTER HERE, WE COPY ALL THE OTHER FILES FROM THE PREVIOUS RUN
+
+
+# 2) Run all the data collection for the city we don't have data
+hdcs_run = hdcs[hdcs['run_again']]
+hdcs_run = hdcs_run["hdc_new"].tolist()
+
+for hdc in hdcs_run[65:95]:
+  regional_analysis(hdc, 
+                    to_test =  [    
+                           'healthcare',
+                           'schools',
+                           'h+s',
+                           'bikeshare',
+                           'carfree',
+                           'blocks',
+                           'density',
+                           'pnft', # VOLTAR PRO PADRAO!!!
+                           'pnrt',
+                           'pnpb', #protected bikeways
+                           'pnab', #all bikeways
+                           'pnst', #combo transit + bike
+                           'highways',
+                           ],
+                    analyze=True, 
+                    summarize=False, 
+                    current_year=2024)
+                    
+# regional_analysis(hdc = "01156", analyze=True, to_test = ['pnft'], summarize = True, current_year=2024, prep = False, jurisdictions=False)
+# regional_analysis(hdc = "05472", analyze=False, to_test = ['pnft'], summarize = True, current_year=2024, prep = False, jurisdictions=False)
+
+# run other cities (from ITDP ) too
+# or no?
+
+
+# 3) Finally, calculate the indicators for every city
+hdcs_all = hdcs["hdc_new"].tolist()
+
+for hdc in hdcs_all:
+  regional_analysis(hdc, to_test = [], jurisdictions = False, prep = False, 
+                    analyze=False, summarize=True,  current_year=2024)
+
+
+# 4) Then calculate the country indicators
+calculate_country_indicators()
+
+
+
+
+
+# all ----------------
 ucdb = gpd.read_file('input_data/ghsl/ghsl_2024.gpkg')
 # ucdb = gpd.read_file('input_data/ghsl/SMOD_V1s6_opr_P2023_v1_2020_labelUC_DB_release.gpkg')
 ucdb.index =  ucdb['ID_UC_G0']
@@ -324,14 +433,3 @@ async def main():
 if __name__ == "__main__":
     asyncio.run(main())
     
-    
-# other
-
-from dask import delayed, compute
-
-# Define tasks
-tasks = [delayed(regional_analysis)(int(hdc)) for hdc in [39, 40]]
-
-# Execute in parallel
-compute(*tasks)
-

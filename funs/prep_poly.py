@@ -46,7 +46,7 @@ def prep_from_poly(hdc, poly, folder_name, boundary_buffer = 500, current_year =
 
     directory = f"input_data/pbf/{current_year}"    
 
-    file_dir = [f for f in os.listdir(directory) if re.search(f"{country_to_open}_{current_year}", f)]
+    file_dir = [f for f in os.listdir(directory) if re.search(f"^{country_to_open}_{current_year}", f)]
     file_dir = [os.path.join(directory, f) for f in file_dir]
     file_dir = ''.join(str(x) for x in file_dir)
     
@@ -77,7 +77,7 @@ def prep_from_poly(hdc, poly, folder_name, boundary_buffer = 500, current_year =
     #take extract from planet.pbf
     if os.path.exists('input_data/planet-latest.osm.pbf'):
         if not os.path.exists('{}/temp/city.pbf'.format(str(folder_name))):
-            command = f"osmium extract {file_dir} -p {str(folder_name)}/temp/boundaries.geojson -s complete_ways -v -o {str(folder_name)}/temp/city_{current_year}.osm.pbf"
+            command = f"osmium extract {file_dir} -p {str(folder_name)}/temp/boundaries.geojson -s complete_ways -v -o {str(folder_name)}/temp/city_{current_year}.osm.pbf --overwrite"
             print(command)
             subprocess.check_call(command.split(' '))
         if not os.path.exists(f"{str(folder_name)}temp/cityhighways_{current_year}.o5m"):

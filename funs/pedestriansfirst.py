@@ -36,152 +36,8 @@ from  funs.prep_pop_ghsl import *
 
 import pdb
 import time
-
-
-def process_bike(edges, quilt_allbike, quilt_protectedbike, center_nodes):
-
-	# Convert graph to data.frame
-	# Preprocessing to handle columns
-	# edges = ox.graph_to_gdfs(G_allroads, nodes=False)
-
-	edges = edges.drop(columns=[
-		'name',
-		'width',
-		'oneway',
-		'reversed',
-		'length',
-		'lanes',
-		'ref',
-		'maxspeed',
-		'access',
-		'bridge',
-		'service',
-		'junction'
-		# 'area',
-		])
-
-	for col in [
-		'highway',
-		'cycleway',
-		'bicycle',
-		'cycleway:left',
-		'cycleway:right',
-		'cycleway:both',
-		]:
-		if col not in edges.columns:
-			edges[col] = ''
-
-	bike_conditions = (edges['highway'] == 'cycleway') \
-		| (edges['highway'] == 'path') & (edges['bicycle']
-			== 'designated') | edges['cycleway:right'].isin(['track',
-			'lane', 'opposite_track']) | edges['cycleway:left'
-			].isin(['track', 'lane', 'opposite_track']) \
-		| edges['cycleway:both'].isin(['track', 'lane', 'opposite_track'
-			]) | edges['cycleway'].isin(['track', 'lane',
-			'opposite_track'])
-
-	# Filter only the bike network
-
-	edges = edges[bike_conditions]
-	total_allbike = edges
-
-	# Add a column to tag protected bike infrastructure
-
-	total_allbike['is_protected'] = (total_allbike['highway']
-			== 'cycleway') | (total_allbike['highway'] == 'path') \
-		& (total_allbike['bicycle'] == 'designated') \
-		| total_allbike['cycleway:right'].isin(['track',
-			'opposite_track']) | total_allbike['cycleway:left'
-			].isin(['track', 'opposite_track']) \
-		| total_allbike['cycleway:both'].isin(['track', 'opposite_track'
-			]) | total_allbike['cycleway'].isin(['track',
-			'opposite_track'])
-
-	# Remove isolated segments for bike infrastructure
-
-	total_allbike['in_real_network'] = 'unknown'
-
-	# Removing isolated lanes (all types) in one step
-
-	def identify_real_network(total_allbike, min_radius=1000, max_jump=300):
-		total_allbike['in_real_network'] = 'unknown'  # Initialize column if not already present
-
-		for idx in total_allbike.index:
-			already_identified = total_allbike.loc[idx,
-					'in_real_network'] == 'unknown'
-
-			# Handle case where 'in_real_network' might be a Series
-
-			if isinstance(already_identified, pd.Series):
-				already_identified = already_identified.any()
-
-			if already_identified:
-				connected_indices = [idx]
-				if shapely.minimum_bounding_radius(total_allbike.loc[connected_indices,
-						'geometry'].unary_union) > min_radius:
-					total_allbike.loc[connected_indices,
-							'in_real_network'] = 'yes'
-				else:
-					for _ in range(10):  # Safety loop to avoid infinite iterations
-						connected_network = \
-							total_allbike.loc[connected_indices,
-								'geometry'].unary_union
-						nearby = \
-							total_allbike[total_allbike.distance(connected_network)
-								< max_jump]
-
-						if 'yes' in nearby['in_real_network'].unique():
-							total_allbike.loc[connected_indices,
-									'in_real_network'] = 'yes'
-							break
-
-						if set(connected_indices) == set(nearby.index):
-							if shapely.minimum_bounding_radius(total_allbike.loc[connected_indices,
-									'geometry'].unary_union) \
-								> min_radius:
-								total_allbike.loc[connected_indices,
-										'in_real_network'] = 'yes'
-							else:
-								total_allbike.loc[connected_indices,
-										'in_real_network'] = 'no'
-							break
-						else:
-							connected_indices = list(nearby.index)
-
-					# Final check to ensure network meets minimum radius
-
-					if shapely.minimum_bounding_radius(total_allbike.loc[connected_indices,
-							'geometry'].unary_union) > min_radius:
-						total_allbike.loc[connected_indices,
-								'in_real_network'] = 'yes'
-
-		return total_allbike[total_allbike['in_real_network'] == 'yes']
-
-	# Apply function
-
-	total_allbike = identify_real_network(total_allbike)
-
-	# Separate protected and all-bike networks
-
-	total_protectedbike = total_allbike[total_allbike['is_protected']]
-
-	# Adding to quilt and center_nodes
-
-	quilt_allbike = pd.concat([quilt_allbike, total_allbike])
-	quilt_protectedbike = pd.concat([quilt_protectedbike,
-									total_protectedbike])
-
-	center_nodes['pnpb'] = set(total_protectedbike.index.map(lambda x: \
-							   x[0]).tolist()
-							   + total_protectedbike.index.map(lambda x: \
-							   x[1]).tolist())
-	center_nodes['pnab'] = set(total_allbike.index.map(lambda x: \
-							   x[0]).tolist()
-							   + total_allbike.index.map(lambda x: \
-							   x[1]).tolist())
-
-	return (quilt_allbike, quilt_protectedbike, center_nodes)
-
+import re
+import math
 
 
 
@@ -260,8 +116,8 @@ def cut(line, distance):
                 LineString([(cp.x, cp.y)] + coords[i:])],
                 cp]
 
-def get_line_mode(mode, name, agency, region, grade, brt_rating):
-    regionalrail = pd.read_csv('input_data/transit_explorer/regionalrail.csv')
+def get_line_mode(mode, name, agency, region, grade, brt_rating, current_year):
+    regionalrail = pd.read_csv(f'input_data/transit_explorer/{current_year}/regionalrail.csv')
     itdp_mode = None
     if mode in ['Light Rail','Tramway']:
         itdp_mode = 'lrt'
@@ -294,7 +150,7 @@ def weighted_pop_density(array):
 
 
 
-# boundaries= total_poly_latlon; name = analysis_areas.loc[0,'name']; boundary_buffer = 1000; id_code = hdc; patch_length = 50000; buffer_dist=100; ghsl_resolution = '1000', headway_threshold=10
+# boundaries= total_poly_latlon; name = analysis_areas.loc[0,'name']; boundary_buffer = 1000; id_code = hdc; patch_length = 50000; buffer_dist=100; ghsl_resolution = '1000'; headway_threshold=10
 
 def spatial_analysis(boundaries, 
                       id_code,
@@ -360,10 +216,11 @@ def spatial_analysis(boundaries,
     
     warnings.simplefilter(action='ignore', category=FutureWarning)
     warnings.simplefilter(action='ignore', category=pd.errors.PerformanceWarning)
-    ox.utils.config(log_console = False)
+    ox.utils.config(log_console = True)
     
     useful_tags = ox.settings.useful_tags_way + ['cycleway', 'cycleway:left', 'cycleway:right', 'cycleway:both', 'bicycle']
-    ox.config(use_cache=True, log_console=False, useful_tags_way=useful_tags)
+    ox.config(use_cache=True, log_console=True, useful_tags_way=useful_tags, overpass_rate_limit=False)
+    # ox.config(use_cache=True, log_console=True, useful_tags_way=useful_tags, overpass_rate_limit=False, overpass_endpoint='https://overpass.kumi.systems/api')
     walk_filter = ('["area"!~"yes"]["highway"]["highway"!~"link|motor'
                    '|proposed|construction|abandoned'
                    '|platform|raceway"]'
@@ -502,7 +359,7 @@ def spatial_analysis(boundaries,
         #itdp_modes = rt_lines.apply(lambda z: get_line_mode(z['mode'], z['name'], z['agency'], z['region'], z['grade'], z['brt_rating']), axis=1)        
         #rt_lines['rt_mode'] = itdp_modes
         for lineidx in rt_lines.index:
-            itdp_mode = get_line_mode(rt_lines.loc[lineidx,'mode'], rt_lines.loc[lineidx,'name'], rt_lines.loc[lineidx,'agency'], rt_lines.loc[lineidx,'region'], rt_lines.loc[lineidx,'grade'], rt_lines.loc[lineidx,'brt_rating'],)
+            itdp_mode = get_line_mode(rt_lines.loc[lineidx,'mode'], rt_lines.loc[lineidx,'name'], rt_lines.loc[lineidx,'agency'], rt_lines.loc[lineidx,'region'], rt_lines.loc[lineidx,'grade'], rt_lines.loc[lineidx,'brt_rating'], current_year)
             rt_lines.loc[lineidx,'rt_mode'] = itdp_mode
         
         rt_lines = rt_lines[rt_lines.rt_mode.isna() == False]
@@ -574,7 +431,7 @@ def spatial_analysis(boundaries,
                 
                 patchgdf.to_file(f'{folder_name}temp/patchbounds.geojson', driver='GeoJSON')
                 subprocess.run(f'python ogr2poly/ogr2poly.py {folder_name}temp/patchbounds.geojson > {folder_name}temp/patchbounds.poly', shell=True, check=True)
-                time.sleep(5) # Sleep for 3 seconds
+                time.sleep(2) # Sleep for 3 seconds
                 
                 #get data
                 try:
@@ -669,10 +526,107 @@ def spatial_analysis(boundaries,
                     
                 center_nodes = {}
                 if 'pnab' in to_test or 'pnpb' in to_test:
-                  print("Processing pnab/pnpb")
-                  quilt_allbike, quilt_protectedbike, center_nodes = process_bike(edges, quilt_allbike, quilt_protectedbike, center_nodes) 
-                    
-                    
+                        print("Processing pnab/pnpb")
+                  
+                        for col in ['highway','cycleway','bicycle','cycleway:left','cycleway:right','cycleway:both']:
+                          if not col in edges.columns:
+                                edges[col] = ''
+                                
+                        tagged_cycleways = edges[(edges['highway'] == 'cycleway')]
+                        cycle_paths = edges[(edges['highway'] == 'path') & (edges['bicycle'] == 'designated')]
+                        on_street_tracks = edges[(edges['cycleway:right'] == 'track') |
+                                                       (edges['cycleway:left'] == 'track') |
+                                                       (edges['cycleway:both'] == 'track') |
+                                                       (edges['cycleway'] == 'track') |
+                                                       (edges['cycleway:right'] == 'opposite_track') |
+                                                        (edges['cycleway:left'] == 'opposite_track') |
+                                                        (edges['cycleway:both'] == 'opposite_track') |
+                                                        (edges['cycleway'] == 'opposite_track')
+                                                       ]
+                        on_street_lanes = edges[(edges['cycleway:right'] == 'lane') |
+                                                       (edges['cycleway:left'] == 'lane') |
+                                                       (edges['cycleway:both'] == 'lane') |
+                                                       (edges['cycleway'] == 'lane')]
+                        
+                        total_protectedbike = pd.concat([tagged_cycleways, cycle_paths, on_street_tracks])
+                        total_allbike = pd.concat([total_protectedbike, on_street_lanes])
+                        
+                        
+                        # exclude tiny, unconnected segments that aren't near larger ones
+                        max_jump = 300
+                        min_radius = 1000
+                        
+                        #remove isolated small lanes from protected network
+                        total_protectedbike['in_real_network'] = "unknown"
+                        for idx in total_protectedbike.index:
+                            already_identified = total_protectedbike.loc[idx,'in_real_network'] == "unknown"
+                            if type(already_identified).__name__ == 'Series':
+                                already_identified = already_identified.any()
+                            if already_identified:
+                                connected_indices = [idx]
+                                if shapely.minimum_bounding_radius(total_protectedbike.loc[connected_indices,'geometry'].unary_union) > min_radius:
+                                    total_protectedbike.loc[connected_indices,'in_real_network'] = "yes"
+                                else:
+                                    for i in range(0,10): #just so we don't end up in an infinite loop somehow
+                                        connected_network = total_protectedbike.loc[connected_indices,'geometry'].unary_union
+                                        nearby = total_protectedbike[total_protectedbike.distance(connected_network) < max_jump]
+                                        if 'yes' in nearby.in_real_network.unique():
+                                            total_protectedbike.loc[connected_indices,'in_real_network'] = "yes"
+                                            break
+                                        if set(connected_indices) == set(nearby.index):
+                                            if shapely.minimum_bounding_radius(total_protectedbike.loc[connected_indices,'geometry'].unary_union) > min_radius:
+                                                total_protectedbike.loc[connected_indices,'in_real_network'] = "yes"
+                                            else:
+                                                total_protectedbike.loc[connected_indices,'in_real_network'] = "no"
+                                            break
+                                        else:
+                                            connected_indices = list(nearby.index)
+                                    if shapely.minimum_bounding_radius(total_protectedbike.loc[connected_indices,'geometry'].unary_union) > min_radius:
+                                        total_protectedbike.loc[connected_indices,'in_real_network'] = "yes"
+                        total_protectedbike = total_protectedbike[total_protectedbike.in_real_network == "yes"]
+                        
+                        #remove isolated small lanes from allbike network
+                        total_allbike['in_real_network'] = "unknown"
+                        for idx in total_allbike.index:
+                            already_identified = total_allbike.loc[idx,'in_real_network'] == "unknown"
+                            if type(already_identified).__name__ == 'Series':
+                                already_identified = already_identified.any()
+                            if already_identified:
+                                connected_indices = [idx]
+                                if shapely.minimum_bounding_radius(total_allbike.loc[connected_indices,'geometry'].unary_union) > min_radius:
+                                    total_allbike.loc[connected_indices,'in_real_network'] = "yes"
+                                else:
+                                    for i in range(0,10): #just so we don't end up in an infinite loop somehow
+                                        connected_network = total_allbike.loc[connected_indices,'geometry'].unary_union
+                                        nearby = total_allbike[total_allbike.distance(connected_network) < max_jump]
+                                        if 'yes' in nearby.in_real_network.unique():
+                                            total_allbike.loc[connected_indices,'in_real_network'] = "yes"
+                                            break
+                                        if set(connected_indices) == set(nearby.index):
+                                            if shapely.minimum_bounding_radius(total_allbike.loc[connected_indices,'geometry'].unary_union) > min_radius:
+                                                total_allbike.loc[connected_indices,'in_real_network'] = "yes"
+                                            else:
+                                                total_allbike.loc[connected_indices,'in_real_network'] = "no"
+                                            break
+                                        else:
+                                            connected_indices = list(nearby.index)
+                                    if shapely.minimum_bounding_radius(total_allbike.loc[connected_indices,'geometry'].unary_union) > min_radius:
+                                        total_allbike.loc[connected_indices,'in_real_network'] = "yes"
+                        total_allbike = total_allbike[total_allbike.in_real_network == "yes"]
+                                
+                        quilt_allbike = pd.concat([quilt_allbike, total_allbike])
+                        quilt_protectedbike = pd.concat([quilt_protectedbike, total_protectedbike])
+                        
+                        center_nodes['pnpb'] = set()
+                        center_nodes['pnab'] = set()
+                        for edge in total_protectedbike.index:
+                            center_nodes['pnpb'].add(edge[0])
+                            center_nodes['pnpb'].add(edge[1])
+                        for edge in total_allbike.index:
+                            center_nodes['pnab'].add(edge[0])
+                            center_nodes['pnab'].add(edge[1])
+                  
+                  
                 if 'highways' in to_test:
                     print("Processing highways...")
                     # SLOW HERE !!!!!!!!!!!!
@@ -1435,6 +1389,7 @@ def calculate_indicators(analysis_areas,
     #         access_grid = None
     
     # 2. Iterate through analysis_areas gdf, calculate all indicators
+    # idx = 202
     for idx in analysis_areas.index:
         try:
             print('getting results for', analysis_areas.loc[idx, 'name'])
@@ -1451,6 +1406,7 @@ def calculate_indicators(analysis_areas,
             # 2.1 Get total_pop for each area, so that we can measure PNx.
             #     Get density at the same time for convenience.
             # 2.1.1 First do years where we have GHSL data...
+            # year = 2025
             for year in years:
                 if (year % 5) == 0:
                     pop_stats = rasterstats.zonal_stats(

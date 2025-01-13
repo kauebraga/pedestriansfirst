@@ -26,9 +26,13 @@ ghsl_2024 <- lapply(files, open_file) %>% rbindlist() %>% st_sf() %>%
   # st_transform(4326) %>%
   dplyr::mutate(ID_UC_G0 = as.integer(ID_UC_G0)) %>%
   dplyr::arrange(ID_UC_G0) %>%
-# format the code to five characters
-mutate(ID_UC_G0 = stringr::str_pad(ID_UC_G0, width = 5, side = "left", pad = 0))
+  # format the code to five characters
+  mutate(ID_UC_G0 = stringr::str_pad(ID_UC_G0, width = 5, side = "left", pad = 0)) %>%
+  # sometimes the hdc doesn't have the long name. in those cases let's make it the short name
+  mutate(GC_UCN_LIS_2025 = ifelse(is.na(GC_UCN_LIS_2025), GC_UCN_MAI_2025, GC_UCN_LIS_2025))
 
+
+file.remove("input_data/ghsl/ghsl_2024.gpkg")
 
 # quickly format this file and export it back
 ghsl_2024 %>%
@@ -37,7 +41,7 @@ ghsl_2024 %>%
 
 ghsl_2024_filter <- ghsl_2024 %>%
   arrange(desc(GC_POP_TOT_2025)) %>%
-  slice(1:1000) %>%
+  filter(GC_POP_TOT_2025 >= 500000) %>%
   arrange(ID_UC_G0)
 
 # export to spreadsheet

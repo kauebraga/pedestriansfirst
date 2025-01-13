@@ -162,8 +162,10 @@ def get_jurisdictions(hdc,
     #then buffer the total_boundaries to the union of those and the original poly
     print('getting sub-jurisdictions for', name)
     admin_lvls = [str(x) for x in range(4,11)] #admin_area below 4 is state/province
+    ox.settings.overpass_settings = '[out:json][timeout:20]{maxsize}'
+    # ox.settings.overpass_settings = '[out:json][timeout:{timeout}]{maxsize}'
     try:
-        jurisdictions_latlon = ox.geometries_from_polygon(buffered_poly_latlon, tags={'admin_level':admin_lvls})
+        jurisdictions_latlon = ox.features_from_polygon(buffered_poly_latlon, tags={'admin_level':admin_lvls})
     except:
         jurisdictions_latlon = gpd.GeoDataFrame()
     if 'admin_level' in jurisdictions_latlon.columns:

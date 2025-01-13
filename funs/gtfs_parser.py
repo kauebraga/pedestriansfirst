@@ -18,6 +18,8 @@ import pandas as pd
 import geopandas as gpd
 import shapely
 from shapely.geometry import Point
+import re
+import math
 
 from zipfile import ZipFile
 
@@ -114,7 +116,11 @@ def get_stop_frequencies(feed, headwaylim, folder_name, filename):
     
 def get_frequent_stops(hdc, year, folder_name, headwaylim = 20):
     # filenames = get_GTFS_from_mobility_database(poly, folder_name+'temp/gtfs/')
-    directory = f"input_data/gtfs/{year}"    
+    directory = f"input_data/gtfs/{year}"
+    
+    
+    if not os.path.exists(folder_name+'temp/gtfs/'):
+      os.mkdir(folder_name+'temp/gtfs/')
 
     filenames = [f for f in os.listdir(directory) if re.search(f"gtfs_{hdc}", f)]
     filenames = [os.path.join(directory, f) for f in filenames]
