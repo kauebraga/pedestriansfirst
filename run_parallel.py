@@ -1,7 +1,14 @@
+
+
 import dask.delayed
 from dask import compute
 from dask.distributed import Client
 
+
+hdcs = pd.read_csv('input_data/hdc_to_run.csv', dtype={'hdc_new' : str})
+
+
+hdcs_all = hdcs["hdc_new"].tolist()
 
 # Initialize the Dask client to enable parallel execution
 client = Client()
@@ -28,10 +35,6 @@ end = timeit.default_timer()
 client.close()
 
 
-hdcs = pd.read_csv('input_data/hdc_to_run.csv', dtype={'hdc_new' : str})
-
-
-hdcs_all = hdcs["hdc_new"].tolist()
 
 
 def run_analysis(hdc):
