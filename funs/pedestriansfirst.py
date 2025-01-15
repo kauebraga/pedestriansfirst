@@ -192,7 +192,7 @@ def spatial_analysis(boundaries,
                             },
                       years = [1975, 1980, 1985, 1990, 1995, 2000, 2005, 2010, 2015, 2020, 2022, 2024, 2025], #for PNRT and pop_dens. remember range(1,3) = [1,2]
                       current_year = 2024,
-                      patch_length = 50000, #m
+                      patch_length = 60000, #m
                       block_patch_length = 1000, #m
                       boundary_buffer = 1000, #m
                       blocks_simplification = 0.0001, #topo-simplification
@@ -342,8 +342,11 @@ def spatial_analysis(boundaries,
             
     if 'pnrt' in to_test:
         #get the dataitdp_modes = rt_lines.apply(lambda z: get_line_mode(z['mode'], z['name'], z['agency'], z['region'], z['grade'], z['brt_rating']), axis=1)        
-        rt_lines = gpd.read_file(f'input_data/transit_explorer/{current_year}/geojson/lines.geojson')
-        rt_stns = gpd.read_file(f'input_data/transit_explorer/{current_year}/geojson/stations.geojson')
+        rt_lines = gpd.read_file(f'input_data/transit_explorer/lines.geojson')
+        rt_stns = gpd.read_file(f'input_data/transit_explorer/stations.geojson')
+        # filter only the transits for th eyear
+        rt_lines = rt_lines.loc[rt_lines.year_open <= current_year]
+        rt_stns = rt_stns.loc[rt_stns.year_open <= current_year]
         #geospatial clip to boundaries
         rt_lines = rt_lines.overlay(boundaries_latlon, how='intersection')
         rt_stns = rt_stns.overlay(boundaries_latlon, how='intersection')
