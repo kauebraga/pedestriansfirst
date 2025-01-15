@@ -280,8 +280,11 @@ for hdc in hdcs_notrun[850:1019]:
 # we need to recalculate PNRT for all --------
 hdcs_all = hdcs["hdc_new"].tolist()
 
-for hdc in hdcs_all:
-  regional_analysis(hdc, to_test = ['pnrt'], analyse=True, summarize=False, jurisdictions=False, current_year=2024, prep=False)
+start = timeit.default_timer()
+for hdc in hdcs_all[1:5]:
+  regional_analysis(hdc, to_test = ['pnrt'], analyse=True, summarize=False, 
+    jurisdictions=False, current_year=2024, prep=False)
+end = timeit.default_timer()
   
   
 from concurrent.futures import ThreadPoolExecutor
@@ -292,7 +295,7 @@ def run_analysis(hdc):
         to_test=['pnrt'],
         analyse=True,
         summarize=False,
-        jurisdictions=False,
+        jurisdictions=True,
         current_year=2024,
         prep=False,
     )
