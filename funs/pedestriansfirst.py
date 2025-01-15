@@ -117,7 +117,8 @@ def cut(line, distance):
                 cp]
 
 def get_line_mode(mode, name, agency, region, grade, brt_rating, current_year):
-    regionalrail = pd.read_csv(f'input_data/transit_explorer/{current_year}/regionalrail.csv')
+    regionalrail = pd.read_csv(f'input_data/transit_explorer/old/regionalrail.csv')
+    regionalrail = regionalrail.loc[regionalrail.year_open <= current_year]
     itdp_mode = None
     if mode in ['Light Rail','Tramway']:
         itdp_mode = 'lrt'
@@ -192,7 +193,7 @@ def spatial_analysis(boundaries,
                             },
                       years = [1975, 1980, 1985, 1990, 1995, 2000, 2005, 2010, 2015, 2020, 2022, 2024, 2025], #for PNRT and pop_dens. remember range(1,3) = [1,2]
                       current_year = 2024,
-                      patch_length = 60000, #m
+                      patch_length = 100000, #m
                       block_patch_length = 1000, #m
                       boundary_buffer = 1000, #m
                       blocks_simplification = 0.0001, #topo-simplification
@@ -364,10 +365,10 @@ def spatial_analysis(boundaries,
         
         rt_lines = rt_lines[rt_lines.rt_mode.isna() == False]
         if len(rt_lines) > 0:
-            rt_lines_utm = ox.project_gdf(rt_lines)
+            rt_lines_utm = ox.projection.project_gdf(rt_lines)
             
         if len(rt_stns) > 0:
-            rt_stns_utm = ox.project_gdf(rt_stns)
+            rt_stns_utm = ox.projection.project_gdf(rt_stns)
         
             for lineidx in rt_lines.index:
                 selected_stns = rt_stns[(rt_stns_utm.intersects(rt_lines_utm.loc[lineidx,'geometry'].buffer(200))) & (rt_stns['mode'] == rt_lines.loc[lineidx, 'mode'])]
@@ -430,7 +431,7 @@ def spatial_analysis(boundaries,
                 patchgdf = gpd.GeoDataFrame(geometry=[patch], crs=4326)
                 
                 patchgdf.to_file(f'{folder_name}temp/patchbounds.geojson', driver='GeoJSON')
-                subprocess.run(f'python ogr2poly/ogr2poly.py {folder_name}temp/patchbounds.geojson > {folder_name}temp/patchbounds.poly', shell=True, check=True)
+                subprocess.run(f'python3 ogr2poly/ogr2poly.py {folder_name}temp/patchbounds.geojson > {folder_name}temp/patchbounds.poly', shell=True, check=True)
                 time.sleep(2) # Sleep for 3 seconds
                 
                 #get data
@@ -515,7 +516,7 @@ def spatial_analysis(boundaries,
                 # reproject
                 print('Reprojecting graph..')
                 if len(G_allroads.edges) > 0 and len(G_allroads.nodes) > 0:
-                    G_allroads = ox.project_graph(G_allroads, to_crs=utm_crs)
+                    G_allroads = ox.projection.project_graph(G_allroads, to_crs=utm_crs)
                     # export?
                     # ox.save_graphml(G_allroads, 'teste_kaue/sp_graph_test.graphml')
                     
@@ -634,7 +635,7 @@ def spatial_analysis(boundaries,
                     # highway_lines_gdf_ll = get_service_locations.get_highways(G_allroads)
                     if highway_lines_gdf_ll is not None and len(list(highway_lines_gdf_ll.geometry)) > 0:
                         all_highway_lines += list(highway_lines_gdf_ll.geometry)
-                        highway_lines_utm = ox.project_gdf(highway_lines_gdf_ll)
+                        highway_lines_utm = ox.projection.project_gdf(highway_lines_gdf_ll)
                         highway_areas_utm = highway_lines_utm.buffer(distances['highways'])
                         highway_areas_ll = highway_areas_utm.to_crs(4326)
                         all_highway_areas +=list(highway_areas_ll.geometry)
@@ -1295,7 +1296,7 @@ def calculate_indicators(analysis_areas,
         except:
             gtfs_filenames = []
     
-    analysis_areas_utm = ox.project_gdf(analysis_areas)
+    analysis_areas_utm = ox.projection.project_gdf(analysis_areas)
     utm_crs = analysis_areas_utm.crs
     analysis_areas_mw = analysis_areas.to_crs("ESRI:54009")
     
