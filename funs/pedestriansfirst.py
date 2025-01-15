@@ -216,10 +216,7 @@ def spatial_analysis(boundaries,
     
     warnings.simplefilter(action='ignore', category=FutureWarning)
     warnings.simplefilter(action='ignore', category=pd.errors.PerformanceWarning)
-    ox.utils.config(log_console = True)
-    
-    useful_tags = ox.settings.useful_tags_way + ['cycleway', 'cycleway:left', 'cycleway:right', 'cycleway:both', 'bicycle']
-    ox.config(use_cache=True, log_console=True, useful_tags_way=useful_tags, overpass_rate_limit=False)
+
     # ox.config(use_cache=True, log_console=True, useful_tags_way=useful_tags, overpass_rate_limit=False, overpass_endpoint='https://overpass.kumi.systems/api')
     walk_filter = ('["area"!~"yes"]["highway"]["highway"!~"link|motor'
                    '|proposed|construction|abandoned'

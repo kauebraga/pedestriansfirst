@@ -64,6 +64,13 @@ import re
 import funs.calculate_country_ind
 from funs.calculate_country_ind import *
 
+    
+useful_tags = ox.settings.useful_tags_way + ['cycleway', 'cycleway:left', 'cycleway:right', 'cycleway:both', 'bicycle']
+ox.settings.log_console = True
+ox.settings.use_cache = True
+ox.settings.useful_tags_way = useful_tags
+ox.settings.overpass_rate_limit = False
+
 # hdc = 11480
 # hdc = "02007" # los angeles
 # hdc = "08154" # fortaleza

@@ -12,7 +12,6 @@ import geopandas as gpd # Pacote Pandas Georreferenciado
 import shapely
 from shapely.geometry import Point, LineString, MultiLineString, Polygon, MultiPolygon, mapping # Pacote Shapely (apenas partes do pacote)
 from shapely.ops import unary_union
-ox.config(log_console=True, use_cache=True)
 
 from copy import deepcopy # duplicar memória do Python
 from tqdm import tqdm # Pacote para visualizar downloads
