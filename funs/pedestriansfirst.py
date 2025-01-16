@@ -1424,6 +1424,7 @@ def calculate_indicators(analysis_areas,
                     density = rasterstats.zonal_stats(boundaries_mw, 
                                             f"{folder_name}geodata/population/pop_{year}.tif", 
                                             stats = [],
+                                            all_touched = True,
                                             add_stats={'weighted': weighted_pop_density}
                                             )[0]['weighted']
                     analysis_areas.loc[idx, f'density_{year}'] = density / sqkm_per_pixel 
