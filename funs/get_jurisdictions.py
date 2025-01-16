@@ -30,6 +30,8 @@ import pdb
 
 # hdc = "08099" # new york
 # hdc = "00507" # tijuana
+# hdc = "07532" # chicago
+# hdc = "08255" # boston
 
 def get_jurisdictions(hdc,
                       minimum_portion = 0.5, #portion of a jurisdiction that has to be within the poly
@@ -64,7 +66,7 @@ def get_jurisdictions(hdc,
     poly_mw_gdf = gpd.GeoDataFrame(geometry=[ghsl_boundaries_mw], crs="ESRI:54009")
     poly_ll_gdf = poly_mw_gdf.to_crs(4326)
     ghsl_boundaries = poly_ll_gdf.unary_union
-    poly_utm_gdf = ox.project_gdf(poly_ll_gdf)
+    poly_utm_gdf = ox.projection.project_gdf(poly_ll_gdf)
     buffered_poly_utm_gdf = poly_utm_gdf.buffer(buffer)
     buffered_poly_latlon_gdf = buffered_poly_utm_gdf.to_crs(4326)
     buffered_poly_utm = buffered_poly_utm_gdf.unary_union
@@ -238,8 +240,10 @@ def get_jurisdictions(hdc,
     
     if len(final_jurisdictions_latlon) > 0:
         for osmid in final_jurisdictions_latlon.index:
+          # osmid = final_jurisdictions_latlon.index[5]
             this_admin_level = final_jurisdictions_latlon.loc[osmid, 'admin_level']
             this_poly = final_jurisdictions_latlon.loc[osmid, 'geometry']
+            # erro aqui!!!!
             containers = final_jurisdictions_latlon[
                 (final_jurisdictions_latlon.contains(this_poly)) & 
                 (final_jurisdictions_latlon.admin_level == this_admin_level)]
