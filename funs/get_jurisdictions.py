@@ -32,6 +32,7 @@ import pdb
 # hdc = "00507" # tijuana
 # hdc = "07532" # chicago
 # hdc = "08255" # boston
+# hdc = "99999" # kohima
 
 def get_jurisdictions(hdc,
                       minimum_portion = 0.5, #portion of a jurisdiction that has to be within the poly
@@ -44,12 +45,13 @@ def get_jurisdictions(hdc,
     
     #Special call to get ITDP "Cycling Cities" where the jurisdiction 
     #is an extra distance from the agglomeration
-    if hdc in [8265, 102]: #kohima, zapopan
+    # if hdc in [8265, 102]: #kohima, zapopan
+    if hdc in ['03105']: #zapopan
         buffer = 40000
     
     #load Urban Centre Database, assign full names
     # here we updated to 2024
-    ucdb = gpd.read_file('input_data/ghsl/ghsl_2024.gpkg', dtype={'hdc' : str})
+    ucdb = gpd.read_file('input_data/ghsl/ghsl_2024.gpkg')
     # ucdb = gpd.read_file('input_data/ghsl/SMOD_V1s6_opr_P2023_v1_2020_labelUC_DB_release.gpkg')
     ucdb.index =  ucdb['ID_UC_G0']
     ghsl_boundaries_mw = ucdb.loc[hdc,'geometry']
@@ -63,7 +65,7 @@ def get_jurisdictions(hdc,
     name_short = "The " + all_names[0] + ' area'
     
     #convert to UTM and buffer
-    poly_mw_gdf = gpd.GeoDataFrame(geometry=[ghsl_boundaries_mw], crs="ESRI:54009")
+    poly_mw_gdf = gpd.GeoDataFrame(geometry=[ghsl_boundaries_mw], crs="4326")
     poly_ll_gdf = poly_mw_gdf.to_crs(4326)
     ghsl_boundaries = poly_ll_gdf.unary_union
     poly_utm_gdf = ox.projection.project_gdf(poly_ll_gdf)
@@ -172,6 +174,8 @@ def get_jurisdictions(hdc,
     # ox.settings.overpass_settings = '[out:json][timeout:{timeout}]{maxsize}'
     try:
         jurisdictions_latlon = ox.features_from_polygon(buffered_poly_latlon, tags={'admin_level':admin_lvls})
+        # remove duplicates
+        jurisdictions_latlon = jurisdictions_latlon[~jurisdictions_latlon.index.duplicated(keep='first')]
     except:
         jurisdictions_latlon = gpd.GeoDataFrame()
     if 'admin_level' in jurisdictions_latlon.columns:
@@ -199,6 +203,8 @@ def get_jurisdictions(hdc,
     try:
     #overpass is used here !!!!!!!!!!!!!!  
         jurisdictions_latlon = ox.features_from_polygon(total_boundaries_latlon, tags={'admin_level':admin_lvls})
+        # remove duplicates
+        jurisdictions_latlon = jurisdictions_latlon[~jurisdictions_latlon.index.duplicated(keep='first')]
         # teste
         # jurisdictions_latlon1 = ox.features_from_polygon(total_boundaries_latlon, tags={'admin_level':admin_lvls})
     except:
@@ -240,7 +246,7 @@ def get_jurisdictions(hdc,
     
     if len(final_jurisdictions_latlon) > 0:
         for osmid in final_jurisdictions_latlon.index:
-          # osmid = final_jurisdictions_latlon.index[5]
+          # osmid = final_jurisdictions_latlon.index[310]
             this_admin_level = final_jurisdictions_latlon.loc[osmid, 'admin_level']
             this_poly = final_jurisdictions_latlon.loc[osmid, 'geometry']
             # erro aqui!!!!

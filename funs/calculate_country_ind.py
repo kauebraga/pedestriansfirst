@@ -66,8 +66,8 @@ from funs.calculate_country_ind import *
 
 
 
-def calculate_country_indicators(current_year=2024,
-                                 rt_and_pop_years = [1975, 1980, 1985, 1990, 1995, 2000, 2005, 2010, 2015, 2020, 2024, 2025,],
+def calculate_country_indicators(current_year=2023,
+                                 rt_and_pop_years = [1975, 1980, 1985, 1990, 1995, 2000, 2005, 2010, 2015, 2020, 2023, 2025,],
                                  input_folder_prefix = 'cities_out/',
                                  output_folder_prefix = 'countries_out/',
                                  #TODO add years for other indicators with more than one
@@ -132,7 +132,7 @@ def calculate_country_indicators(current_year=2024,
     current_year_indicators_avg = [
         'healthcare',
         'schools',
-        'h+s',
+        'hs',
         'bikeshare',
         'pnab',
         'pnpb',

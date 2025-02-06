@@ -75,29 +75,26 @@ def prep_from_poly(hdc, poly, folder_name, boundary_buffer = 500, current_year =
     with open(folder_name+'temp/boundaries.geojson', 'w') as out:
         out.write(json.dumps(geom_in_geojson))
     #take extract from planet.pbf
-    if os.path.exists('input_data/planet-latest.osm.pbf'):
-        if not os.path.exists('{}/temp/city.pbf'.format(str(folder_name))):
-            command = f"osmium extract {file_dir} -p {str(folder_name)}/temp/boundaries.geojson -s complete_ways -v -o {str(folder_name)}/temp/city_{current_year}.osm.pbf --overwrite"
-            print(command)
-            subprocess.check_call(command.split(' '))
-        if not os.path.exists(f"{str(folder_name)}temp/cityhighways_{current_year}.o5m"):
-            # command = f"osmosis --read-pbf {str(folder_name)}temp/city.pbf --write-xml {str(folder_name)}temp/city.osm"
-            # # command = f"osmconvert {str(folder_name)}temp/city.pbf -o={str(folder_name)}temp/city.o5m"
-            # print(command)
-            # subprocess.check_call(command.split(' '))
-            command = f"osmium tags-filter {str(folder_name)}/temp/city_{current_year}.osm.pbf w/highway -o {str(folder_name)}temp/cityhighways_{current_year}.osm --overwrite",
-            # command = f"osmium tags-filter {str(folder_name)}/temp/city.osm.pbf nwr highway,type,cycleway,bicycle,cycleway:left,cycleway:right,cycleway:both,area,service,foot,bridge,tunnel,oneway,lanes,ref,name,maxspeed,access,landuse,width,est_width,junction -o {str(folder_name)}temp/cityhighways.osm --overwrite",
-            # command = f'osmfilter {str(folder_name)}temp/city.osm --keep="highway=" --keep-tags="all type= highway= cycleway= bicycle= cycleway:left= cycleway:right= cycleway:both= area= service= foot= bridge= tunnel= oneway= lanes= ref= name= maxspeed= access= landuse= width= est_width= junction=" -o={str(folder_name)}temp/cityhighways.osm'
-            # command = f'osmfilter {str(folder_name)}temp/city.o5m --keep="highway=" --keep-tags="all type= highway= cycleway= bicycle= cycleway:left= cycleway:right= cycleway:both= area= service= foot= bridge= tunnel= oneway= lanes= ref= name= maxspeed= access= landuse= width= est_width= junction=" -o={str(folder_name)}temp/cityhighways.o5m'
-            print(command)
-            subprocess.check_call(command, shell=True)
-            # do only for bikes
-            command = f"osmium tags-filter {str(folder_name)}/temp/city_{current_year}.osm.pbf w/highway -o {str(folder_name)}temp/cityhighways_{current_year}.osm --overwrite",
-            subprocess.check_call(command, shell=True)
-            #todo -- read both bikeways and walkways direct from a patch'd cityhighways.osm; do walking/cycling selection logic in here.
-            command = [f'osmfilter {str(folder_name)}temp/cityhighways_{current_year}.osm --drop="area=yes highway=link =motor =proposed =construction =abandoned =platform =raceway service=parking_aisle =driveway =private foot=no" -o={str(folder_name)}temp/citywalk_{current_year}.osm']
-            print(command)
-            subprocess.check_call(command, shell=True)
-        return False
-    else:
-        return True
+    if not os.path.exists('{}/temp/city.pbf'.format(str(folder_name))):
+        command = f"osmium extract {file_dir} -p {str(folder_name)}/temp/boundaries.geojson -s complete_ways -v -o {str(folder_name)}/temp/city_{current_year}.osm.pbf --overwrite"
+        print(command)
+        subprocess.check_call(command.split(' '))
+    if not os.path.exists(f"{str(folder_name)}temp/cityhighways_{current_year}.o5m"):
+        # command = f"osmosis --read-pbf {str(folder_name)}temp/city.pbf --write-xml {str(folder_name)}temp/city.osm"
+        # # command = f"osmconvert {str(folder_name)}temp/city.pbf -o={str(folder_name)}temp/city.o5m"
+        # print(command)
+        # subprocess.check_call(command.split(' '))
+        command = f"osmium tags-filter {str(folder_name)}/temp/city_{current_year}.osm.pbf w/highway -o {str(folder_name)}temp/cityhighways_{current_year}.osm --overwrite",
+        # command = f"osmium tags-filter {str(folder_name)}/temp/city.osm.pbf nwr highway,type,cycleway,bicycle,cycleway:left,cycleway:right,cycleway:both,area,service,foot,bridge,tunnel,oneway,lanes,ref,name,maxspeed,access,landuse,width,est_width,junction -o {str(folder_name)}temp/cityhighways.osm --overwrite",
+        # command = f'osmfilter {str(folder_name)}temp/city.osm --keep="highway=" --keep-tags="all type= highway= cycleway= bicycle= cycleway:left= cycleway:right= cycleway:both= area= service= foot= bridge= tunnel= oneway= lanes= ref= name= maxspeed= access= landuse= width= est_width= junction=" -o={str(folder_name)}temp/cityhighways.osm'
+        # command = f'osmfilter {str(folder_name)}temp/city.o5m --keep="highway=" --keep-tags="all type= highway= cycleway= bicycle= cycleway:left= cycleway:right= cycleway:both= area= service= foot= bridge= tunnel= oneway= lanes= ref= name= maxspeed= access= landuse= width= est_width= junction=" -o={str(folder_name)}temp/cityhighways.o5m'
+        print(command)
+        subprocess.check_call(command, shell=True)
+        # do only for bikes
+        command = f"osmium tags-filter {str(folder_name)}/temp/city_{current_year}.osm.pbf w/highway -o {str(folder_name)}temp/cityhighways_{current_year}.osm --overwrite",
+        subprocess.check_call(command, shell=True)
+        #todo -- read both bikeways and walkways direct from a patch'd cityhighways.osm; do walking/cycling selection logic in here.
+        command = [f'osmfilter {str(folder_name)}temp/cityhighways_{current_year}.osm --drop="area=yes highway=link =motor =proposed =construction =abandoned =platform =raceway service=parking_aisle =driveway =private foot=no" -o={str(folder_name)}temp/citywalk_{current_year}.osm']
+        print(command)
+        subprocess.check_call(command, shell=True)
+    return False

@@ -131,7 +131,7 @@ def get_line_mode(mode, name, agency, region, grade, brt_rating, current_year):
                 (regionalrail['region'] == region)]['ADD?'].values:
             itdp_mode = 'mrt'
     if mode == 'Bus Rapid Transit':
-        if brt_rating is not None:
+        # if brt_rating is not None:
             if brt_rating not in ['','Not BRT']:
                 itdp_mode ='brt'
     grades = grade.split('; ')
@@ -162,7 +162,7 @@ def spatial_analysis(boundaries,
                       to_test = [
                            'healthcare',
                            'schools',
-                           'h+s',
+                           'hs',
                            #'libraries',
                            'bikeshare',
                            'carfree',
@@ -191,8 +191,9 @@ def spatial_analysis(boundaries,
                             'pnab': 250,
                             'highways':500,
                             },
-                      years = [1975, 1980, 1985, 1990, 1995, 2000, 2005, 2010, 2015, 2020, 2022, 2024, 2025], #for PNRT and pop_dens. remember range(1,3) = [1,2]
-                      current_year = 2024,
+                      # years = [2023], #for PNRT and pop_dens. remember range(1,3) = [1,2]
+                      years = [1975, 1980, 1985, 1990, 1995, 2000, 2005, 2010, 2015, 2020, 2022, 2023, 2025], #for PNRT and pop_dens. remember range(1,3) = [1,2]
+                      current_year = 2023,
                       patch_length = 100000, #m
                       block_patch_length = 1000, #m
                       boundary_buffer = 1000, #m
@@ -228,7 +229,7 @@ def spatial_analysis(boundaries,
     
     if folder_name != '' and not folder_name[-1:] == '/':
         folder_name += '/'
-    if 'h+s' in to_test:
+    if 'hs' in to_test:
         for part in ['healthcare', 'schools']:
             if not part in to_test:
                 to_test.append(part)
@@ -360,6 +361,7 @@ def spatial_analysis(boundaries,
         #itdp_modes = rt_lines.apply(lambda z: get_line_mode(z['mode'], z['name'], z['agency'], z['region'], z['grade'], z['brt_rating']), axis=1)        
         #rt_lines['rt_mode'] = itdp_modes
         for lineidx in rt_lines.index:
+            # lineidx = 0
             itdp_mode = get_line_mode(rt_lines.loc[lineidx,'mode'], rt_lines.loc[lineidx,'name'], rt_lines.loc[lineidx,'agency'], rt_lines.loc[lineidx,'region'], rt_lines.loc[lineidx,'grade'], rt_lines.loc[lineidx,'brt_rating'], current_year)
             rt_lines.loc[lineidx,'rt_mode'] = itdp_mode
         
@@ -804,7 +806,8 @@ def spatial_analysis(boundaries,
             patches.times = patch_times
             patches.to_file(folder_name+'debug/patches_with_times.geojson', driver='GeoJSON')
             pd.DataFrame({'failures':failures}).to_csv(folder_name+'debug/failures.csv')
-
+    
+    # subprocess.run(f'echo -e "Finished patching" >> logs/running_{id_code}.csv')
     
     debugcounter = 1
     print(debugcounter); debugcounter+=1
@@ -815,7 +818,7 @@ def spatial_analysis(boundaries,
         geodata_subfolders.append(service+'/')
         geodata_subfolders.append(service+'_points/')
     geodata_subfolders += [
-        'h+s',
+        'hs',
         'protectedbike/',
         'allbike/',
         'carfree/',
@@ -895,9 +898,9 @@ def spatial_analysis(boundaries,
        
     print(debugcounter); debugcounter+=1
         
-    if 'h+s' in to_test:
+    if 'hs' in to_test:
         if quilt_isochrone_polys['healthcare'] and quilt_isochrone_polys['schools']:
-            service = 'h+s'
+            service = 'hs'
             intersect = shapely.ops.unary_union([quilt_isochrone_polys['healthcare'].intersection(quilt_isochrone_polys['schools'])])
             if type(intersect) == shapely.geometry.collection.GeometryCollection:
                 if not intersect.is_empty:
@@ -996,6 +999,9 @@ def spatial_analysis(boundaries,
             
             try:
                 rapidtransport = gpd.read_file(f'{folder_name}geodata/rapid_transit/{current_year}/all_isochrones_ll.geojson')
+                # convert to polygon if empty?
+                if rapidtransport["geometry"].is_empty.all():
+                    rapidtransport["geometry"] = rapidtransport["geometry"].apply(lambda geom: Polygon() if geom.is_empty else geom)
                 if rapidtransport.unary_union is None:
                     rapidtransport = gpd.GeoDataFrame(geometry = [], crs=4326)
             except:
@@ -1261,7 +1267,7 @@ def calculate_indicators(analysis_areas,
                       to_test = [
                            'healthcare',
                            'schools',
-                           'h+s',
+                           'hs',
                            #'libraries',
                            'bikeshare',
                            'carfree',
@@ -1279,8 +1285,8 @@ def calculate_indicators(analysis_areas,
                            'journey_gap',
                            ],
                       #years = range(1975,2031),
-                      years = [1975, 1980, 1985, 1990, 1995, 2000, 2005, 2010, 2015, 2020, 2024, 2025],
-                      current_year = 2024,
+                      years = [1975, 1980, 1985, 1990, 1995, 2000, 2005, 2010, 2015, 2020, 2023, 2025],
+                      current_year = 2023,
                       ghsl_resolution = '1000',
                       debug = True,
                       ):   
@@ -1304,7 +1310,7 @@ def calculate_indicators(analysis_areas,
     
     # 1. Load data files for each indicator
     # 1.1: Services (People Near X, except for rapid transit)
-    services = ['healthcare','schools','h+s','libraries','bikeshare','pnab','pnpb',
+    services = ['healthcare','schools','hs','libraries','bikeshare','pnab','pnpb',
                 'pnft','pnst','carfree','special', 'highways']
     service_gdfs_utm = {}
     for service in services:
@@ -1449,7 +1455,7 @@ def calculate_indicators(analysis_areas,
                     analysis_areas.loc[idx, f'density_{year}'] = current_dens
                         
             # 2.2 People Near Services
-            services = ['healthcare','schools','h+s','libraries','bikeshare','pnab','pnpb',
+            services = ['healthcare','schools','hs','libraries','bikeshare','pnab','pnpb',
                         'pnft','pnst','carfree','highways','special']
             for service in services:
                 if service in to_test:

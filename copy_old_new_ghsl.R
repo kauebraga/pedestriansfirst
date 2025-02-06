@@ -25,12 +25,12 @@ ghsl_old <- st_read("input_data/ghsl/SMOD_V1s6_opr_P2023_v1_2020_labelUC_DB_rele
   st_transform(crs = 4326) %>%
   # filter(POP_2020 > 50000) %>%
   select(hdc = ID_UC_G0, NAME_MAIN) %>%
-  filter(hdc %in% hdcs) %>%
+  # filter(hdc %in% hdcs) %>%
   st_make_valid()
 
 ghsl_new <- st_read("input_data/ghsl/ghsl_2024.gpkg") %>%
   st_transform(crs = 4326) %>%
-  filter(POP_2020 > 50000) %>%
+  # filter(POP_2020 > 50000) %>%
   select(hdc = ID_UC_G0, NAME_MAIN) %>%
   st_make_valid()
 

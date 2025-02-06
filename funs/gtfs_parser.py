@@ -70,6 +70,16 @@ def get_stop_frequencies(feed, headwaylim, folder_name, filename):
    #     log(folder_name, "validation_failed,"+feed.agency.agency_name[0])
     #    os.remove(filename)
      #   return {}
+     # feed = feed_from_filename("input_data/gtfs/2023/gtfs_05472_202404_Transjakarta_fixed.zip")
+     # feed = feed_from_filename("input_data/gtfs/2023/gtfs_05472_202404_Bogor_Angkots__fixed.zip")
+     # feed = feed_from_filename("input_data/gtfs/2023/raw/gtfs_05472_202404_Bogor_Angkots_.zip") 
+     # feed = feed_from_filename("input_data/gtfs/2023/raw/gtfs_05472_202404_Transjakarta.zip")
+     # feed = feed_from_filename("/home/kauebraga/Downloads/gtfs_05472_202404_Transjakarta.zip")
+     # feed = feed_from_filename("/home/kauebraga/Downloads/gtfs_05472_202404_Transjakarta (1).zip")
+     # feed = feed_from_filename("input_data/gtfs/2023/gtfs_00070_202404_Gruppo_Torinese_Trasporti.zip")
+     # feed = feed_from_filename("input_data/gtfs/2023/gtfs_00047_202404_Freetown_PodaPoda_Sierra_Leone_Road_Transport_Corp.zip")
+     # feed = feed_from_filename("input_data/gtfs/2023/gtfs_01156_202404_TMT_Trujillo _Gerencia_de_Transporte_fixed.zip")
+     
     try:
         days = feed.get_first_week()[0:5]
     except:
@@ -116,6 +126,11 @@ def get_stop_frequencies(feed, headwaylim, folder_name, filename):
     
 def get_frequent_stops(hdc, year, folder_name, headwaylim = 20):
     # filenames = get_GTFS_from_mobility_database(poly, folder_name+'temp/gtfs/')
+   #  hdc = "05472"
+    # year = 2023
+    # headwaylim = 20
+    # folder_name = 'cities_out'+'/ghsl_region_'+str(hdc)+'/'
+    
     directory = f"input_data/gtfs/{year}"
     
     

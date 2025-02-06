@@ -1,5 +1,5 @@
 library(sf)
-library(mapview)
+# library(mapview)
 library(data.table)
 library(dplyr)
 library(purrr)
@@ -10,10 +10,10 @@ ghsl_table <- fread("input_data/pbf/pbf_hdc_country.csv")
 
 # create the file to open
 # extract date
-year <- format(Sys.Date(), "%Y")
-# year <- "2024"
-month <- format(Sys.Date(), "%m")
-# month <- "04"
+# year <- format(Sys.Date(), "%Y")
+year <- "2024"
+# month <- format(Sys.Date(), "%m")
+month <- "12"
 
 # create the url to download countries from ghsl
 ghsl_countries <- distinct(ghsl_table, region, country1) %>%
@@ -36,16 +36,16 @@ ghsl_countries <- distinct(ghsl_table, region, country1) %>%
 
 
 # to download - south america to test
-url_download <- ghsl_countries %>% filter(country1 == "russia")
-# url_download <- ghsl_countries %>% filter(region == "north-america")
+# url_download <- ghsl_countries %>% filter(country1 == "russia")
+url_download <- ghsl_countries %>% filter(region == "asia")
 response_download <- purrr::map2(url_download$url,
                                  url_download$file_dir,
                                  possibly(curl::curl_download, quiet = FALSE, otherwise = "erro")
 )
 
 
-# check if everything was downloaded
-countries <- dir("input_data/pbf/2024")
-countries <- sub(pattern = "(\\w)_(.*$)", replacement = "\\1", x = countries) 
-left <- setdiff(ghsl_countries$country1, countries)
+# # check if everything was downloaded
+# countries <- dir("input_data/pbf/2024")
+# countries <- sub(pattern = "(\\w)_(.*$)", replacement = "\\1", x = countries) 
+# left <- setdiff(ghsl_countries$country1, countries)
 

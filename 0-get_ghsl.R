@@ -34,14 +34,37 @@ ghsl_2024 <- lapply(files, open_file) %>% rbindlist() %>% st_sf() %>%
 
 file.remove("input_data/ghsl/ghsl_2024.gpkg")
 
-# quickly format this file and export it back
-ghsl_2024 %>%
+
+# manually add the agglomeration of 
+# kohima <- st_read("input_data/ghsl/kohima.geojson")
+kohima <- st_read("input_data/ghsl/kohima.geojson") %>%
+  mutate(ID_UC_G0 = "99999", GC_UCN_MAI_2025 = "Kohima", GC_UCN_LIS_2025 = "Kohima", GC_POP_TOT_2025 = 267988, 
+         GC_UCA_KM2_2025 = as.numeric(st_area(.) * 10^-6),
+         GC_CNT_GAD_2025 = "India",
+         region = "central-and-southern-asia") %>%
+  select(ID_UC_G0, GC_UCN_MAI_2025, GC_UCN_LIS_2025, GC_POP_TOT_2025, GC_UCA_KM2_2025, GC_CNT_GAD_2025, region) %>%
+  st_transform(4326) %>%
+  # give it a buffer
+  st_transform(24344) %>%
+  st_buffer(dist = 2000) %>%
+  st_transform(4326)
+
+# mapview(kohima) + kohima1
+
+st_geometry(kohima) <- "geom"
+
+ghsl_2024_new <- ghsl_2024 %>%
+  st_transform(4326) %>%
+  bind_rows(kohima)
+
+# add kohima and quickly format this file and export it back
+ghsl_2024_new %>%
   select(ID_UC_G0, NAME_MAIN = GC_UCN_MAI_2025, NAME_LIST = GC_UCN_LIS_2025, POP_2020 = GC_POP_TOT_2025, BU_m2_2020 = GC_UCA_KM2_2025) %>%
   st_write("input_data/ghsl/ghsl_2024.gpkg", append = FALSE)
 
-ghsl_2024_filter <- ghsl_2024 %>%
+ghsl_2024_filter <- ghsl_2024_new %>%
   arrange(desc(GC_POP_TOT_2025)) %>%
-  filter(GC_POP_TOT_2025 >= 500000) %>%
+  filter(GC_POP_TOT_2025 >= 500000 | ID_UC_G0 %in% c('02006' , '02249' , '03048', '99999')) %>%
   arrange(ID_UC_G0)
 
 # export to spreadsheet

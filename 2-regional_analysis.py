@@ -80,9 +80,11 @@ ox.settings.overpass_rate_limit = False
 # hdc = "01156" # trujillo
 # hdc = "05472" # jakarta
 # hdc = "05816" # london
+# hdc = "00992" # amman
+# hdc = "99999" # kohima
 
 
-# folder_prefix = 'cities_out'; current_year=2024; minimum_portion=0.6; hdc = "08154"
+# folder_prefix = 'cities_out'; current_year=2023; minimum_portion=0.6;
 
 
 def regional_analysis(hdc, to_test, folder_prefix = 'cities_out', minimum_portion=0.6, prep = True, analyse=True,summarize=True,jurisdictions=True,simplification=0.001, current_year=2024, cleanup = False):
@@ -105,7 +107,11 @@ def regional_analysis(hdc, to_test, folder_prefix = 'cities_out', minimum_portio
     
     """
     
-
+    df = pd.DataFrame()
+    
+    # Define the CSV file path
+    csv_file = f"logs/running_{hdc}.csv"
+    df.to_csv(csv_file, mode='a', header=True, index=False)
     
     #1) set up directories
     if not os.path.isdir('temp/'):
@@ -173,7 +179,7 @@ def regional_analysis(hdc, to_test, folder_prefix = 'cities_out', minimum_portio
           # [    
                          # 'healthcare',
                          # 'schools',
-                         # 'h+s',
+                         # 'hs',
                          # 'bikeshare',
                          # 'carfree',
                          # 'blocks',
@@ -209,6 +215,11 @@ def regional_analysis(hdc, to_test, folder_prefix = 'cities_out', minimum_portio
         
         nongeospatial_results = analysis_areas.drop('geometry', axis=1, inplace=False)
         nongeospatial_results.to_csv(f'{folder_name}indicator_values.csv')
+        
+    # Define the CSV file path
+    os.remove(csv_file)
+    csv_file = f"logs/finished_{hdc}.csv"
+    df.to_csv(csv_file, mode='a', header=True, index=False)
     
     #clean up big files
     if cleanup:
@@ -265,7 +276,7 @@ print('Time final: ', stop - start)
 
 
 
-calculate_country_indicators()
+calculate_country_indicators(current_year = 2023)
 
 
 
@@ -324,7 +335,7 @@ for hdc in hdcs_run[65:95]:
                     to_test =  [    
                            'healthcare',
                            'schools',
-                           'h+s',
+                           'hs',
                            'bikeshare',
                            'carfree',
                            'blocks',
