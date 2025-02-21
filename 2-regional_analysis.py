@@ -81,13 +81,13 @@ ox.settings.overpass_rate_limit = False
 # hdc = "05472" # jakarta
 # hdc = "05816" # london
 # hdc = "00992" # amman
-# hdc = "99999" # kohima
+# hdc = "00212" # kohima
 
 
 # folder_prefix = 'cities_out'; current_year=2023; minimum_portion=0.6;
 
 
-def regional_analysis(hdc, to_test, folder_prefix = 'cities_out', minimum_portion=0.6, prep = True, analyse=True,summarize=True,jurisdictions=True,simplification=0.001, current_year=2024, cleanup = False):
+def regional_analysis(hdc, to_test, folder_prefix = '/media/kauebraga/data/pedestriansfirst/cities_out', minimum_portion=0.6, prep = True, analyse=True,summarize=True,jurisdictions=True,simplification=0.001, current_year=2024, cleanup = False):
     """Run analysis scripts for a given region
     
     Uses lots (too many?) hardcoded defaults

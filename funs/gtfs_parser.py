@@ -25,37 +25,41 @@ from zipfile import ZipFile
 
 from funs.get_jurisdictions import get_jurisdictions
 
-def feed_from_filename(filename):
+# filename = "input_data/gtfs/2024/gtfs_08154_202412_2010Etufor.zip"
+# hdc = "08154"
+
+def feed_from_filename(filename, hdc):
     
     try:
-        if not os.path.isdir('temp_gtfs_dir/'):
-            os.mkdir('temp_gtfs_dir/')
+        if not os.path.isdir(f'temp_gtfs_dir/{hdc}/'):
+            # os.mkdir('temp_gtfs_dir')
+            os.mkdir(f'temp_gtfs_dir/{hdc}/')
         with ZipFile(filename, 'r') as zgtfs:
-            zgtfs.extractall('temp_gtfs_dir/')
+            zgtfs.extractall(f'temp_gtfs_dir/{hdc}/')
         # command = 'unzip '+filename+' -d temp_gtfs_dir/'
         # print(command)
         # subprocess.check_call(command, shell=True)
     except:
-        if os.path.exists('temp_gtfs_dir'):
-            shutil.rmtree('temp_gtfs_dir')
+        if os.path.exists(f'temp_gtfs_dir/{hdc}/'):
+            shutil.rmtree(f'temp_gtfs_dir/{hdc}/')
         return False
-    if os.path.exists('temp_gtfs_dir/calendar.txt'):
+    if os.path.exists(f'temp_gtfs_dir/{hdc}/calendar.txt'):
         #this fixes a bug that was happening because San Francisco, of all places, ended text lines with whitespace
-        with open('temp_gtfs_dir/calendar.txt','r') as calfile:
+        with open(f'temp_gtfs_dir/{hdc}/calendar.txt','r') as calfile:
             out = ''
             for line in calfile:
                 out += line.strip()
                 out += '\n'
-        with open('temp_gtfs_dir/calendar.txt','w') as calfile:
+        with open(f'temp_gtfs_dir/{hdc}/calendar.txt','w') as calfile:
             calfile.write(out)
     try:
-        feed = gk.read_feed('temp_gtfs_dir/', dist_units = 'km')
+        feed = gk.read_feed(f'temp_gtfs_dir/{hdc}/', dist_units = 'km')
     except pd.errors.ParserError:
         return False
     except KeyError:
         return False
-    if os.path.exists('temp_gtfs_dir'):
-        shutil.rmtree('temp_gtfs_dir')
+    if os.path.exists(f'temp_gtfs_dir/{hdc}/'):
+        shutil.rmtree(f'temp_gtfs_dir/{hdc}/')
     return feed
 
 def log(folder_name, msg):
@@ -126,10 +130,10 @@ def get_stop_frequencies(feed, headwaylim, folder_name, filename):
     
 def get_frequent_stops(hdc, year, folder_name, headwaylim = 20):
     # filenames = get_GTFS_from_mobility_database(poly, folder_name+'temp/gtfs/')
-   #  hdc = "05472"
-    # year = 2023
+   #  hdc = "08154"
+    # year = 2024
     # headwaylim = 20
-    # folder_name = 'cities_out'+'/ghsl_region_'+str(hdc)+'/'
+    # folder_name = '/media/kauebraga/data/pedestriansfirst/cities_out'+'/ghsl_region_'+str(hdc)+'/'
     
     directory = f"input_data/gtfs/{year}"
     
@@ -146,7 +150,7 @@ def get_frequent_stops(hdc, year, folder_name, headwaylim = 20):
     for filename in filenames:
         # filename = filenames[0]
         try:
-            feed = feed_from_filename(filename)
+            feed = feed_from_filename(filename, hdc)
             counts = get_stop_frequencies(feed, headwaylim, folder_name, filename)
         except UnicodeDecodeError:
             print ('did not add stops!! UnicodeDecodeError')

@@ -27,17 +27,18 @@ from datetime import datetime
 import numpy
 import math
 
-def get_GTFS_from_mobility_database(hdc, sources_loc='input_data/gtfs/gtfs_sources.csv'):
+def get_GTFS_from_mobility_database(hdc, sources_loc='input_data/gtfs/mobilitydata_feeds_202502.csv'):
     
   # Get the current date and format it as yearmonth
-  year = "2025"
+  year = "2024"
   # year = datetime.now().strftime("%Y")
-  today_yearmonth = "202501"
+  today_yearmonth = "202412"
   # today_yearmonth = datetime.now().strftime("%Y%m")
 
 
   # collect boundaries
-  boundaries = get_jurisdictions(hdc)
+  # boundaries = get_jurisdictions(hdc)
+  boundaries = gpd.read_file(f'/media/kauebraga/data/pedestriansfirst/cities_out/ghsl_region_{hdc}/debug/analysis_areas.gpkg')    
   #Let's make sure to buffer this to include peripheral roads etc for routing
   boundaries=boundaries.unary_union
   boundaries = shapely.convex_hull(boundaries)
@@ -58,14 +59,17 @@ def get_GTFS_from_mobility_database(hdc, sources_loc='input_data/gtfs/gtfs_sourc
       with open(sources_loc, 'wb') as f:
           f.write(r.content)
   sources = gpd.read_file(sources_loc)
+  # remove deprecated?
+  sources = sources[sources.status != "deprecated"]
   filenames = []
   for idx in list(sources.index):
-      if not sources.loc[idx,'location.bounding_box.minimum_longitude'] == '':
+      # idx = 2322
+      if not sources.loc[idx,'bounding_box.minimum_longitude'] == '':
           sources.loc[idx,'geometry'] = shapely.geometry.box(
-              float(sources.loc[idx,'location.bounding_box.minimum_longitude']),
-              float(sources.loc[idx,'location.bounding_box.minimum_latitude']),
-              float(sources.loc[idx,'location.bounding_box.maximum_longitude']),
-              float(sources.loc[idx,'location.bounding_box.maximum_latitude']),
+              float(sources.loc[idx,'bounding_box.minimum_longitude']),
+              float(sources.loc[idx,'bounding_box.minimum_latitude']),
+              float(sources.loc[idx,'bounding_box.maximum_longitude']),
+              float(sources.loc[idx,'bounding_box.maximum_latitude']),
               )
           if sources.loc[idx,'geometry'].intersects(boundaries):
               overlap = sources.loc[idx,'geometry'].intersection(boundaries)
@@ -87,10 +91,8 @@ def get_GTFS_from_mobility_database(hdc, sources_loc='input_data/gtfs/gtfs_sourc
 
 
 # apply function
-ucdb = pd.read_csv('input_data/pbf/pbf_hdc_country.csv', dtype={'hdc' : str})
-ucdb_ok = ucdb[ucdb['pop'] >= 500000]
-ucdb_ok_africa = ucdb_ok[ucdb_ok['region'] == "south-america"]
-hdcs_to_test = ucdb_ok_africa['hdc'].tolist()
+hdcs = pd.read_csv('input_data/pbf/pbf_hdc_country.csv', dtype={'hdc' : str})
+hdcs_to_test = hdcs['hdc'].tolist()
 
 for hdc in hdcs_to_test:
     get_GTFS_from_mobility_database(hdc)

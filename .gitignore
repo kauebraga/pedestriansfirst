@@ -74,3 +74,5 @@ input_data
 .Rhistory
 .Rprofile
 *.Rproj
+logs
+countries_out

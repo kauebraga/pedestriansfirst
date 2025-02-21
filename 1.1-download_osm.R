@@ -37,7 +37,7 @@ ghsl_countries <- distinct(ghsl_table, region, country1) %>%
 
 # to download - south america to test
 # url_download <- ghsl_countries %>% filter(country1 == "russia")
-url_download <- ghsl_countries %>% filter(region == "asia")
+url_download <- ghsl_countries %>% filter(region == "central-america")
 response_download <- purrr::map2(url_download$url,
                                  url_download$file_dir,
                                  possibly(curl::curl_download, quiet = FALSE, otherwise = "erro")

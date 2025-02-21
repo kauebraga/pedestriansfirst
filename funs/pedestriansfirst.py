@@ -1014,16 +1014,16 @@ def spatial_analysis(boundaries,
             except:
                 frequenttransport = gpd.GeoDataFrame(geometry = [], crs=4326)
             
-            if protectedbike.unary_union is None: 
+            if protectedbike.empty or protectedbike.unary_union is None: 
                 #no bike
                 transport_and_bike_latlon = gpd.GeoDataFrame(geometry = [], crs=4326)
-            elif rapidtransport.unary_union is None and frequenttransport.unary_union is None:
+            elif rapidtransport.empty and frequenttransport.empty:
                 #bike, but neither kind of transit
                 transport_and_bike_latlon = gpd.GeoDataFrame(geometry = [], crs=4326)
-            elif rapidtransport.unary_union is None:
+            elif rapidtransport.empty:
                 #only frequent, no rapid
                 transport_and_bike_latlon = frequenttransport.overlay(protectedbike, how="intersection")
-            elif frequenttransport.unary_union is None:
+            elif frequenttransport.empty:
                 #only rapid, no frequent
                 try:
                     transport_and_bike_latlon = rapidtransport.overlay(protectedbike, how="intersection")
