@@ -74,6 +74,9 @@ def get_jurisdictions(hdc,
     buffered_poly_utm = buffered_poly_utm_gdf.unary_union
     buffered_poly_latlon = buffered_poly_latlon_gdf.unary_union
     
+    
+    # buffered_poly_utm_gdf.to_file("teste_kaue/salvador_boundaires.gpkg")
+    
     #set up dataframe for output
     analysis_areas = gpd.GeoDataFrame()
     new_id = 0
@@ -99,6 +102,7 @@ def get_jurisdictions(hdc,
     earth_utm = country_bounds.to_crs(crs = poly_utm_gdf.crs)
     #get land within 10km
     area_for_land_ll = buffered_poly_utm_gdf.buffer(100000).to_crs(4326).unary_union
+     # buffered_poly_utm_gdf.to_file("teste_kaue/area_for_land_ll.gpkg")
     
     try:
         country_land_sum = country_bounds.intersection(area_for_land_ll).area.sum()
@@ -176,6 +180,7 @@ def get_jurisdictions(hdc,
         jurisdictions_latlon = ox.features_from_polygon(buffered_poly_latlon, tags={'admin_level':admin_lvls})
         # remove duplicates
         jurisdictions_latlon = jurisdictions_latlon[~jurisdictions_latlon.index.duplicated(keep='first')]
+        # jurisdictions_latlon.to_file('teste_kaue/teste_salvador.gpkg')
     except:
         jurisdictions_latlon = gpd.GeoDataFrame()
     if 'admin_level' in jurisdictions_latlon.columns:
@@ -187,6 +192,7 @@ def get_jurisdictions(hdc,
         select_jurisdictions_utm = jurisdictions_utm[selection]
         print(f'found {len(select_jurisdictions_utm)} with {minimum_portion} inside area')
         select_jurisdictions_latlon = select_jurisdictions_utm.to_crs(4326)
+        # select_jurisdictions_latlon.to_file('teste_kaue/teste_salvador1.gpkg')
     else:
         select_jurisdictions_latlon = []
     if len(select_jurisdictions_latlon) > 0:
@@ -207,6 +213,7 @@ def get_jurisdictions(hdc,
         jurisdictions_latlon = jurisdictions_latlon[~jurisdictions_latlon.index.duplicated(keep='first')]
         # teste
         # jurisdictions_latlon1 = ox.features_from_polygon(total_boundaries_latlon, tags={'admin_level':admin_lvls})
+        # jurisdictions_latlon.to_file('teste_kaue/teste_salvador2.gpkg')
     except:
         jurisdictions_latlon = gpd.GeoDataFrame()
         
@@ -215,14 +222,20 @@ def get_jurisdictions(hdc,
     else:
         try:
             jurisdictions_latlon = jurisdictions_latlon.loc[('relation',)]
+            
             print(f'found {len(jurisdictions_latlon)} on second pass')
             jurisdictions_utm = jurisdictions_latlon.to_crs(buffered_poly_utm_gdf.crs)
+            # jurisdictions_utm.to_file('teste_kaue/teste_salvadorbefore.gpkg')
+            # THE PROBLEM IS ON THIS STEP!!!!
             jurisdictions_utm = gpd.clip(jurisdictions_utm, nearby_land_gdf_utm.unary_union)
+            # nearby_land_gdf_utm.to_file('teste_kaue/teste_salvador323_parcial.gpkg')
+            # jurisdictions_utm.to_file('teste_kaue/teste_salvador323.gpkg')
             jurisdictions_clipped_utm = jurisdictions_utm.intersection(total_boundaries_utm)
             selection = (jurisdictions_clipped_utm.area / jurisdictions_utm.area) > 0.95
             select_jurisdictions_utm = jurisdictions_utm[selection]
             print(f'found {len(select_jurisdictions_utm)} with 0.95 inside total area')
             selected_levels = []
+            
             for admin_level in select_jurisdictions_utm.admin_level.unique():
                 selection = select_jurisdictions_utm[select_jurisdictions_utm.admin_level==admin_level]
                 if selection.area.mean() >= level_min_mean_area*1000000:
@@ -234,6 +247,7 @@ def get_jurisdictions(hdc,
                     print(f'admin_level={admin_level} excluded: polys too small: avg {selection.area.mean()/1000000}km2')
             final_jurisdictions_utm = select_jurisdictions_utm[select_jurisdictions_utm.admin_level.isin(selected_levels)]
             final_jurisdictions_latlon = final_jurisdictions_utm.to_crs(4326)
+            # final_jurisdictions_latlon.to_file('teste_kaue/teste_salvador3.gpkg')
             print(f'found {len(final_jurisdictions_latlon)} in acceptable admin levels {selected_levels}')
         except: 
             final_jurisdictions_latlon = []
@@ -287,7 +301,7 @@ def get_jurisdictions(hdc,
                 new_id += 1
     
     # analysis_areas.to_csv(f'teste_kaue/teste_{hdc}.csv', sep=',')
-    # analysis_areas.to_file(f'teste_kaue/teste_{hdc}.gpkg', driver='GPKG')
+    # analysis_areas.to_file(f'teste_kaue/teste_salvador_final.gpkg', driver='GPKG')
     return analysis_areas
 
 

@@ -246,157 +246,10 @@ def spatial_analysis(boundaries,
     boundaries_mw = boundaries_utm.to_crs("ESRI:54009")
     boundaries = boundaries_latlon.geometry.unary_union
     
-    print('Calculating geodata for Pedestrians First indicators in',name, "id",id_code)
-    print('Measuring',str(to_test))
-    
-    # open population data
-    for year in years:
-        if year % 5 == 0:
-            if year < current_year:
-                in_file = f'input_data/ghsl_data_{ghsl_resolution}m_mw/GHS_POP_E{year}_GLOBE_R2023A_54009_{ghsl_resolution}/GHS_POP_E{year}_GLOBE_R2023A_54009_{ghsl_resolution}_V1_0.tif'
-            else:
-                in_file = f'input_data/ghsl_data_{ghsl_resolution}m_mw/GHS_POP_E{year}_GLOBE_R2023A_54009_{ghsl_resolution}/GHS_POP_E{year}_GLOBE_R2023A_54009_{ghsl_resolution}_V1_0.tif'
-            with rasterio.open(in_file) as dataset:
-                out_image, out_transform = rasterio.mask.mask(dataset, [boundaries_mw.unary_union], crop=True)
-                out_meta = dataset.meta
-                out_meta.update({"driver": "GTiff",
-                      "height": out_image.shape[1],
-                      "width": out_image.shape[2],
-                      "transform": out_transform})
-            if not os.path.exists(f"{folder_name}geodata/population"):
-                os.mkdir(f"{folder_name}geodata/population")
-            with rasterio.open(f"{folder_name}geodata/population/pop_{year}.tif", "w", **out_meta) as dest:
-                dest.write(out_image)
-            #for current year, 
-    
-    testing_services = []
-    for service in ['healthcare', 'schools', 'libraries', 'bikeshare']:
-        if service in to_test:
-            testing_services.append(service)
-            
-    service_point_locations={}
-    if len(testing_services) > 0:
-        handler = ServiceHandler()
-        # !!!!!!!!! AQUI LENTO!!!!!!!
-        handler.apply_file(folder_name+f'temp/city_{current_year}.osm.pbf', locations=True)
-        for service in testing_services:
-          # service = testing_services[1]
-            coords = handler.locationlist[service]
-            service_point_locations[service] = gpd.GeoDataFrame(
-                geometry = [Point(coord) for coord in coords],
-                crs=4326)
-        citywide_carfree = handler.carfreelist
-                
     if 'pnab' in to_test or 'pnpb' in to_test:
         testing_services.append('pnab')
         testing_services.append('pnpb')
         
-    if 'highways' in to_test:
-        all_highway_lines = []
-        all_highway_areas = []
-
-    if 'special' in to_test:
-        special = gpd.read_file(f'{folder_name}special.geojson')
-        if special.geometry[0].type == 'MultiLineString':
-            special.crs = 4326
-            special_utm = special.to_crs(utm_crs)
-            points=[]
-            for line in special_utm.geometry.unary_union:
-                line = shapely.ops.transform(lambda x, y, z=None: (x, y), line)
-                while line.length > 50:
-                    cutlines, point = cut(line, 50)
-                    points.append(point)
-                    line=cutlines[1]
-            points_utm = gpd.GeoDataFrame(geometry=points, crs=utm_crs)
-            points_latlon = points_utm.to_crs(4326)
-            service_point_locations['special'] = points_latlon
-        
-        elif special.geometry[0].type == 'LineString':
-            special.crs = 4326
-            special_utm = special.to_crs(utm_crs)
-            points=[]
-            for line in special_utm.geometry:
-                line = shapely.ops.transform(lambda x, y, z=None: (x, y), line)
-                while line.length > 50:
-                    cutlines, point = cut(line, 50)
-                    points.append(point)
-                    line=cutlines[1]
-            points_utm = gpd.GeoDataFrame(geometry=points, crs=utm_crs)
-            points_latlon = points_utm.to_crs(4326)
-            service_point_locations['special'] = points_latlon
-        elif special.geometry[0].type == 'Point':
-            service_point_locations['special'] = special
-        else:
-            import pdb; pdb.set_trace()
-            raise RuntimeError
-        testing_services.append('special')
-
-    if 'pnft' in to_test:
-        testing_services.append('pnft')
-        freq_stops, gtfs_wednesdays = get_frequent_stops(hdc = id_code, year = current_year, folder_name = folder_name, headwaylim = headway_threshold)
-        service_point_locations['pnft'] = freq_stops
-        gtfs_filenames = [file for file in os.listdir(folder_name+'temp/gtfs/') if file[-4:] == '.zip']
-        
-        
-            
-    if 'pnrt' in to_test:
-        #get the dataitdp_modes = rt_lines.apply(lambda z: get_line_mode(z['mode'], z['name'], z['agency'], z['region'], z['grade'], z['brt_rating']), axis=1)        
-        rt_lines = gpd.read_file(f'input_data/transit_explorer/lines.geojson')
-        rt_stns = gpd.read_file(f'input_data/transit_explorer/stations.geojson')
-        # filter only the transits for th eyear
-        rt_lines = rt_lines.loc[rt_lines.year_open <= current_year]
-        rt_stns = rt_stns.loc[rt_stns.year_open <= current_year]
-        #geospatial clip to boundaries
-        rt_lines = rt_lines.overlay(boundaries_latlon, how='intersection')
-        rt_stns = rt_stns.overlay(boundaries_latlon, how='intersection')
-        #remove lines/stations that are not public access
-        rt_lines = rt_lines[rt_lines['limited'] == 0]
-        rt_stns = rt_stns[rt_stns['limited'] == 0]
-        
-        rt_lines['rt_mode'] = None
-        rt_stns['rt_mode'] = None
-        
-        #include only the modes we care about
-        
-        #itdp_modes = rt_lines.apply(lambda z: get_line_mode(z['mode'], z['name'], z['agency'], z['region'], z['grade'], z['brt_rating']), axis=1)        
-        #rt_lines['rt_mode'] = itdp_modes
-        for lineidx in rt_lines.index:
-            # lineidx = 0
-            itdp_mode = get_line_mode(rt_lines.loc[lineidx,'mode'], rt_lines.loc[lineidx,'name'], rt_lines.loc[lineidx,'agency'], rt_lines.loc[lineidx,'region'], rt_lines.loc[lineidx,'grade'], rt_lines.loc[lineidx,'brt_rating'], current_year)
-            rt_lines.loc[lineidx,'rt_mode'] = itdp_mode
-        
-        rt_lines = rt_lines[rt_lines.rt_mode.isna() == False]
-        if len(rt_lines) > 0:
-            rt_lines_utm = ox.projection.project_gdf(rt_lines)
-            
-        if len(rt_stns) > 0:
-            rt_stns_utm = ox.projection.project_gdf(rt_stns)
-        
-            for lineidx in rt_lines.index:
-                selected_stns = rt_stns[(rt_stns_utm.intersects(rt_lines_utm.loc[lineidx,'geometry'].buffer(200))) & (rt_stns['mode'] == rt_lines.loc[lineidx, 'mode'])]
-                rt_stns.loc[selected_stns.index,'rt_mode'] = rt_lines.loc[lineidx,'rt_mode']
-        
-        rt_stns = rt_stns[rt_stns.rt_mode.isna() == False]
-            
-        rt_isochrones = rt_stns.copy()
-        rt_stns_utm = rt_stns.to_crs(utm_crs)
-        rt_isochrones_utm = rt_isochrones.to_crs(utm_crs)
-        
-    # if 'journey_gap' in to_test and len(gtfs_filenames) > 0 and len(gtfs_wednesdays) > 0: #ie, it has GTFS
-    #     journey_gap_success = access.journey_gap_calculations(
-    #                 folder_name,
-    #                 current_year,
-    #                 boundaries_latlon,
-    #                 gtfs_filenames,
-    #                 gtfs_wednesdays,
-    #                 access_resolution = access_resolution,
-    #                 min_pop = 2000,
-    #                 )
-    
-    if 'blocks' in to_test:
-        outblocks = []
-        block_counts = []
-    
     quilt_isochrone_polys = {}
     for service in to_test:
         quilt_isochrone_polys[service] = False
@@ -436,82 +289,54 @@ def spatial_analysis(boundaries,
                 subprocess.run(f'python3 ogr2poly/ogr2poly.py {folder_name}temp/patchbounds.geojson > {folder_name}temp/patchbounds.poly', shell=True, check=True)
                 time.sleep(2) # Sleep for 3 seconds
                 
-                # clip osm data to the patch boundaries?
-                subprocess.check_call(['osmconvert',
-                                       os.path.join(folder_name, f'temp/cityhighways_{current_year}.osm'),
-                                       f'-B={folder_name}temp/patchbounds.poly',
-                                       '--drop-broken-refs',  #was uncommented
-                                       '--complete-ways',
-                                       # '--complete-multipolygons',
-                                       f'-o={folder_name}temp/patch_allroads.osm'])
-                                       
-                # subprocess.check_call('osmosis --read-xml file="cities_out/ghsl_region_2007/temp/cityhighways.osm" --bounding-polygon file="cities_out/ghsl_region_2007/temp/patchbounds.poly" --write-xml file="cities_out/ghsl_region_2007/temp/patch_allroads.osm"')
-                # subprocess.check_call('osmosis --read-xml file="cities_out/ghsl_region_2007/temp/cityhighways.osm"')
-                
-                # !!!!!!!!!!!!
-                # AQUI QUE TALVEZ ESTEJA DEMORANDO DEMAIS!!!
-                print('Creating graph..')
-                G_allroads_unsimplified = ox.graph_from_xml(f'{folder_name}temp/patch_allroads.osm', simplify=False, retain_all=True)
-                # os.remove(f'{folder_name}temp/patch_allroads.osm')
-            
-                
-                
-                
+                #get data
+                try:
+                    # clip osm data to the patch boundaries?
+                    subprocess.check_call(['osmconvert',
+                                           os.path.join(folder_name, f'temp/cityhighways_{current_year}.osm'),
+                                           f'-B={folder_name}temp/patchbounds.poly',
+                                           '--drop-broken-refs',  #was uncommented
+                                           '--complete-ways',
+                                           # '--complete-multipolygons',
+                                           f'-o={folder_name}temp/patch_allroads.osm'])
+                                           
+                    
+                    # !!!!!!!!!!!!
+                    # AQUI QUE TALVEZ ESTEJA DEMORANDO DEMAIS!!!
+                    print('Creating graph..')
+                    G_allroads_unsimplified = ox.graph_from_xml(f'{folder_name}temp/patch_allroads.osm', simplify=False, retain_all=True)
+                    # os.remove(f'{folder_name}temp/patch_allroads.osm')
+                    
+                       
+                #label links that are not in tunnels
+                #so highway identification works properly later
+                #
                 print('Filtering graph..')
                 for x in G_allroads_unsimplified.edges:
                     if 'tunnel' not in G_allroads_unsimplified.edges[x].keys():
                         G_allroads_unsimplified.edges[x]['tunnel'] = "no" 
                         
-                print('Lenght G_allroads_unsimplified:', {len(G_allroads_unsimplified)}) 
-                        
-
-                        
-                        
                 #then simplify
                 G_allroads = ox.simplify_graph(G_allroads_unsimplified)
                 
-                print('Lenght G_allroads1:', {len(G_allroads)}) 
-                
                                         
-                # # Assuming G is your graph
-                # num_nodes = G_allroads.number_of_nodes()
-                # num_edges = G_allroads.number_of_edges()
-                # nx.write_edgelist(G_allroads, f"teste_kaue/graph_{id_code}_simplified_pl.txt", data=False)  # Excludes edge attributes
-                        
                 # remove something?
                 G_allroads.remove_nodes_from(list(nx.isolates(G_allroads)))
                 
-                print('Lenght G_allroads2:', {len(G_allroads)} ) 
-                
-                # num_nodes = G_allroads.number_of_nodes()
-                # num_edges = G_allroads.number_of_edges()
-                # nx.write_edgelist(G_allroads, f"teste_kaue/graph_{id_code}_removed_pl.txt", data=False)  # Excludes edge attributes
-                
-
                 
                 # reproject
                 print('Reprojecting graph..')
                 if len(G_allroads.edges) > 0 and len(G_allroads.nodes) > 0:
                     G_allroads = ox.projection.project_graph(G_allroads, to_crs=utm_crs)
                     # export?
-                print('Lenght G_allroads3:', {len(G_allroads)}) 
                 
-                # num_nodes = G_allroads.number_of_nodes()
-                # num_edges = G_allroads.number_of_edges()
-                # nx.write_edgelist(G_allroads, f"teste_kaue/graph_{id_code}_reproj_pl.txt", data=False)  # Excludes edge attributes
-
-                    
                     
                 # transform the network to gdfs: will be neccesary for process_bike, get_highways and blocks
                 # THE PROBLEMS FROM THE PARALELIZION IS HERE!!!!! AND IT ONLY HAPPENS FOR EDGES!!!
                 print("Transforming network to GDF")
                 nodes, edges = ox.graph_to_gdfs(G_allroads)
                 
-                print('Lenght G_allroads3:', {len(edges)} ) 
-                
-                edges.to_file(f'teste_kaue/graph_{id_code}_reproj.geojson', driver='GeoJSON')
-                
-                
+                # nodes.to_file(f'teste_kaue/graph_{id_code}_reproj.geojson', driver='GeoJSON')
                     
                 center_nodes = {}
                 if 'pnab' in to_test or 'pnpb' in to_test:
@@ -1025,13 +850,11 @@ def spatial_analysis(boundaries,
                 #all of the above
                 rapid_or_frequent = rapidtransport.overlay(frequenttransport, how="union")
                 transport_and_bike_latlon = rapid_or_frequent.overlay(protectedbike, how="intersection")
-                
-                        
+            
             
             transport_and_bike_utm = transport_and_bike_latlon.to_crs(utm_crs)
             if transport_and_bike_utm.geometry.area.sum() != 0:
-                # I set keep_geom_type = False because it was returning an error as it resulted in GeometryCollection
-                transport_and_bike_utm = gpd.overlay(transport_and_bike_utm, boundaries_utm, how='intersection', keep_geom_type = False)
+                transport_and_bike_utm = gpd.overlay(transport_and_bike_utm ,boundaries_utm, how='intersection')
                 new_geoms = transport_and_bike_utm.geometry.simplify(services_simplification).make_valid().unary_union
                 
                 if new_geoms.type == 'GeometryCollection':
@@ -1409,8 +1232,6 @@ def calculate_indicators(analysis_areas,
             # year = 2025
             for year in years:
                 if (year % 5) == 0:
-                    # idx = 138
-                    # year = 2025
                     pop_stats = rasterstats.zonal_stats(
                         analysis_areas_mw.loc[idx,'geometry'],
                         f"{folder_name}geodata/population/pop_{year}.tif", 

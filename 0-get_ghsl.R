@@ -110,7 +110,7 @@ ghsl_2024_filter1 <- ghsl_2024_filter %>%
     country %in% c("Malaysia", "Singapore")  ~ "Malaysia Singapore Brunei",
     country %in% c("Israel", "Palestine")  ~ "Israel and Palestine",
     country == "United States" ~ "US",
-    country == "Puerto Rico" ~ "US",
+    # country == "Puerto Rico" ~ "US",
     country %in% c("Haiti", "Dominican Republic") ~ "Haiti and Domrep",
     country %in% c("Ireland") ~ "Ireland and Northern Ireland",
     country %in% c("Czechia") ~ "Czech Republic",

@@ -40,17 +40,18 @@ hdcs_all = hdcs["hdc"].tolist()
 def run_analysis(hdc):
   return regional_analysis(
     hdc,
-    to_test=['healthcare',
-                'schools',
-                'hs',
-                'bikeshare',
-                'carfree',
+    to_test=['pnpb', #protected bikeways
+            'pnab', #all bikeways
+            # 'healthcare',
+                # 'schools',
+                # 'hs',
+                # 'bikeshare',
+                # 'carfree',
                 'blocks',
-                'density',
-                # 'pnft', # VOLTAR PRO PADRAO!!!
+                # 'density',
+                'pnft', # VOLTAR PRO PADRAO!!!
                 'pnrt',
-                'pnpb', #protected bikeways
-                'pnab', #all bikeways
+
                 'pnst', #combo transit + bike
                 'highways'],
     summarize=False,
@@ -61,9 +62,7 @@ def run_analysis(hdc):
     )
 
 # set up cluster with 20 workers. Each worker uses 1 thread and has a 64GB memory limit.
-client = Client(n_workers=4,
-                threads_per_worker=1,
-                memory_limit='64GB')
+client = Client(n_workers=10,threads_per_worker=1,memory_limit='64GB')
 
 # have a look at your workers
 client
@@ -85,7 +84,7 @@ def run_analysis_safe(hdc):
         return f"Error in {hdc}: {e}"  # Return error message instead of crashing
 
 # Create a list of delayed tasks
-results = [run_analysis_safe(hdc) for hdc in hdcs_all[1000:1117]]
+results = [run_analysis_safe(hdc) for hdc in hdcs_all[501:900]]
 # Compute the results (this will trigger the parallel execution)
 results1 = compute(*results)
 
@@ -114,15 +113,16 @@ hdcs_ran = [re.search(r'\d{5}', file).group() for file in hdcs_ran if re.search(
 hdcs_left = list(set(hdcs_all) - set(hdcs_ran))
 len(hdcs_left)
 
-client = Client(n_workers=4,
-                threads_per_worker=1,
-                memory_limit='48GB')
+client = Client(n_workers=3,threads_per_worker=1,memory_limit='48GB')
 
 # Create a list of delayed tasks
-results = [run_analysis_safe(hdc) for hdc in hdcs_left]
+results = [run_analysis_safe(hdc) for hdc in hdcs_left[0:50]]
 # Compute the results (this will trigger the parallel execution)
 results1 = compute(*results)
 
+
+ for hdc in hdcs_left:
+   run_analysis(hdc)
 
 
 #########################################################################################
@@ -137,6 +137,7 @@ hdc_gtfs = {re.search(r"(?<=gtfs_)\d{5}", f).group() for f in files if re.search
 
 # Convert the set to a sorted list (optional)
 hdc_gtfs = sorted(hdc_gtfs)
+len(hdc_gtfs)
 
 
 # now, parallel
@@ -144,7 +145,7 @@ hdc_gtfs = sorted(hdc_gtfs)
 def run_analysis(hdc):
   return regional_analysis(
     hdc,
-    to_test=['pnft'],
+    to_test=['pnab', 'pnpb'],
     summarize=False,
     jurisdictions=False,
     current_year=2024,
@@ -153,9 +154,7 @@ def run_analysis(hdc):
     )
 
 # set up cluster with 20 workers. Each worker uses 1 thread and has a 64GB memory limit.
-client = Client(n_workers=8,
-                threads_per_worker=1,
-                memory_limit='64GB')
+client = Client(n_workers=20, threads_per_worker=1,memory_limit='64GB')
 
 # have a look at your workers
 client
@@ -171,99 +170,69 @@ def run_analysis_safe(hdc):
       
 # filter only the ones with GTFS
 
+# where is 08154
+hdcs_all.index('08154')
 
 # Create a list of delayed tasks
-results = [run_analysis_safe(hdc) for hdc in hdc_gtfs[1:100]]
+results = [run_analysis_safe(hdc) for hdc in hdcs_all[968:969]]
 # Compute the results (this will trigger the parallel execution)
 results1 = compute(*results)
 
-
+out = hdcs_all[1004:1117]
+# remove the ones without the gtfs
+out1 =  list(set(out) - set(hdc_gtfs))
+len(out1)
+# Create a list of delayed tasks
+results = [run_analysis_safe(hdc) for hdc in out1]
+# Compute the results (this will trigger the parallel execution)
+results1 = compute(*results)
 
   #########################################################################################
 # calculate the indicators! (summarize = True)
 #########################################################################################
 
-@dask.delayed
-def run_calculations(hdc):
+def run_indicators(hdc):
   return regional_analysis(
     hdc,
     to_test=[],
     analyse=False,
     summarize=True,
     jurisdictions=False,
-    current_year=2023,
+    current_year=2024,
     prep=False
   )
 
+@dask.delayed
+def run_indicators_safe(hdc):
+    try:
+        return run_indicators(hdc)  # Your original function
+    except Exception as e:
+        return f"Error in {hdc}: {e}"  # Return error message instead of crashing
 
 # Close the client after computation is done
 client.close()
 
-client = Client(n_workers=24,
+client = Client(n_workers=20,
                 threads_per_worker=1,
-                memory_limit='24GB')
+                memory_limit='48GB')
 
 
 # Create a list of delayed tasks
-results = [run_calculations(hdc) for hdc in hdcs_all]
+results = [run_indicators_safe(hdc) for hdc in hdcs_all[1001:1117]]
 # Compute the results (this will trigger the parallel execution)
-compute(*results)
+results1 = compute(*results)
 
 
-start = timeit.default_timer()
+Marcstart = timeit.default_timer()
 run_analysis("00178")
 end = timeit.default_timer()
 
 
 
 #########################################################################################
-# Run PNFT for all
-
-
-
-
+# country calculations
 #########################################################################################
 
-# test for jakarta
-regional_analysis(
-    "99999",
-    to_test=['healthcare',
-                'schools',
-                'hs',
-                'bikeshare',
-                'carfree',
-                'blocks',
-                'density',
-                'pnft', # VOLTAR PRO PADRAO!!!
-                'pnrt',
-                'pnpb', #protected bikeways
-                'pnab', #all bikeways
-                'pnst', #combo transit + bike
-                'highways'],
-    summarize=False,
-    jurisdictions=True,
-    current_year=2024,
-    prep=True
-    )
-  
-  
-  regional_analysis(
-    "01156",
-    to_test=["pnft"],
-    analyse=True,
-    summarize=True,
-    jurisdictions=False,
-    current_year=2023,
-    prep=False
-  )
-  
-  
-regional_analysis(
-    "08154",
-    to_test=["pnft"],
-    analyse=True,
-    summarize=False,
-    jurisdictions=False,
-    current_year=2024,
-    prep=False
-  )
+
+calculate_country_indicators(current_year = 2023)
+calculate_country_indicators(current_year = 2024)

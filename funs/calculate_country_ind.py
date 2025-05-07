@@ -67,9 +67,9 @@ from funs.calculate_country_ind import *
 
 
 def calculate_country_indicators(current_year=2023,
-                                 rt_and_pop_years = [1975, 1980, 1985, 1990, 1995, 2000, 2005, 2010, 2015, 2020, 2023, 2025,],
-                                 input_folder_prefix = 'cities_out/',
-                                 output_folder_prefix = 'countries_out/',
+                                 rt_and_pop_years = [1975, 1980, 1985, 1990, 1995, 2000, 2005, 2010, 2015, 2020, 2023, 2025],
+                                 input_folder_prefix = '/media/kauebraga/data/pedestriansfirst/cities_out/',
+                                 output_folder_prefix = '/media/kauebraga/data/pedestriansfirst/countries_out/',
                                  #TODO add years for other indicators with more than one
                                  ):
     """calculate country-level indicators by summarizing city level indicators
@@ -218,8 +218,8 @@ def calculate_country_indicators(current_year=2023,
     #get data from city-level output
     print('iterating through cities_out/')
     for city_folder in tqdm(os.listdir(f'{input_folder_prefix}')):
-        if os.path.exists(f'{input_folder_prefix}{city_folder}/indicator_values.csv'):
-            city_results = gpd.read_file(f'{input_folder_prefix}{city_folder}/indicator_values.gpkg')
+        if os.path.exists(f'{input_folder_prefix}{city_folder}/indicator_values_{current_year}.csv'):
+            city_results = gpd.read_file(f'{input_folder_prefix}{city_folder}/indicator_values_{current_year}.gpkg')
             #first add to list of full cities
             hdc = city_folder.split('_')[-1]
             all_cities.loc[hdc, 'ID_HDC_G0'] = hdc
@@ -319,13 +319,13 @@ def calculate_country_indicators(current_year=2023,
     #save output
     if not os.path.exists(f'{output_folder_prefix}'):
         os.mkdir(f'{output_folder_prefix}')
-    country_final_values.to_csv(f'{output_folder_prefix}country_results.csv')
-    region_final_values.to_csv(f'{output_folder_prefix}region_results.csv')
+    country_final_values.to_csv(f'{output_folder_prefix}country_results_{current_year}.csv')
+    region_final_values.to_csv(f'{output_folder_prefix}region_results_{current_year}.csv')
     country_geometries = []
     for country in country_final_values.index:
         country_geometries.append(country_bounds[country_bounds.shapeGroup == country].unary_union)
     country_gdf = gpd.GeoDataFrame(country_final_values, geometry=country_geometries, crs=4326)
-    country_gdf.to_file(f'{output_folder_prefix}country_results.geojson', driver='GeoJSON')
+    country_gdf.to_file(f'{output_folder_prefix}country_results_{current_year}.geojson', driver='GeoJSON')
     all_cities.crs=4326
-    all_cities.to_file(f'{output_folder_prefix}all_cities.geojson',driver='GeoJSON')
-    pd.DataFrame(all_cities.drop(columns='geometry')).to_csv(f'{output_folder_prefix}all_cities.csv')
+    all_cities.to_file(f'{output_folder_prefix}all_cities_{current_year}.geojson',driver='GeoJSON')
+    pd.DataFrame(all_cities.drop(columns='geometry')).to_csv(f'{output_folder_prefix}all_cities_{current_year}.csv')
