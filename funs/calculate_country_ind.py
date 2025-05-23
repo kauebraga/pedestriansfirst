@@ -66,8 +66,8 @@ from funs.calculate_country_ind import *
 
 
 
-def calculate_country_indicators(current_year=2023,
-                                 rt_and_pop_years = [1975, 1980, 1985, 1990, 1995, 2000, 2005, 2010, 2015, 2020, 2023, 2025],
+def calculate_country_indicators(current_year=2024,
+                                 rt_and_pop_years = [1975, 1980, 1985, 1990, 1995, 2000, 2005, 2010, 2015, 2020, 2023, 2024, 2025],
                                  input_folder_prefix = '/media/kauebraga/data/pedestriansfirst/cities_out/',
                                  output_folder_prefix = '/media/kauebraga/data/pedestriansfirst/countries_out/',
                                  #TODO add years for other indicators with more than one
@@ -93,6 +93,11 @@ def calculate_country_indicators(current_year=2023,
     
     
     country_bounds = gpd.read_file('input_data/CGAZ/geoBoundaries_ITDPv5_SIMPLIFIED.gpkg')
+    # un_countries =      gpd.read_file("input_data/regions/un_countries.gpkg")
+    # un_continents =     gpd.read_file("input_data/regions/un_continents.gpkg")
+    # un_regions =        gpd.read_file("input_data/regions/un_regions.gpkg")
+    # worldbank_regions = gpd.read_file("input_data/regions/worldbank_regions.gpkg")
+    # worldbank_income =  gpd.read_file("input_data/regions/worldbank_income.gpkg")
     
     country_bounds.geometry = country_bounds.make_valid()
     for idx in list(country_bounds.index):
@@ -117,10 +122,22 @@ def calculate_country_indicators(current_year=2023,
     
     countries_ISO = list(country_bounds.shapeGroup.unique())
     
-    country_regions_organizations = pd.read_csv('input_data/Countries_Regions_Organizations.csv')
-    country_regions_organizations.index = country_regions_organizations['ISO Code']
-    all_orgs = list(country_regions_organizations.columns)[3:]
-    all_regions = list(country_regions_organizations.Region.unique())
+    
+    # open the table with the relationshuip with the countries and the other regions
+    country_regions_organizations = pd.read_csv("input_data/regions/regions_lookup.csv")
+    country_regions_organizations.index = country_regions_organizations['ISO_Alpha3_Code']
+    country_regions_organizations["UN_Continent"] = 'UN Continents / ' + country_regions_organizations["UN_Continent"]
+    country_regions_organizations["UN_Region"] = 'UN Regions / ' + country_regions_organizations["UN_Region"]
+    country_regions_organizations["World_Bank_Region"] = 'World Bank Regions / ' + country_regions_organizations["World_Bank_Region"]
+    country_regions_organizations["World_Bank_Income_Group"] = 'World Bank Income / ' + country_regions_organizations["World_Bank_Income_Group"]
+    all_un_continents = list(country_regions_organizations.UN_Continent.unique())
+    all_un_regions = list(country_regions_organizations.UN_Region.unique())
+    all_worldbank_regions = list(country_regions_organizations.World_Bank_Region.unique())
+    all_worldbank_income = list(country_regions_organizations.World_Bank_Income_Group.unique())
+    # country_regions_organizations = pd.read_csv('input_data/Countries_Regions_Organizations.csv')
+    # country_regions_organizations.index = country_regions_organizations['ISO Code']
+    # all_orgs = list(country_regions_organizations.columns)[3:]
+    # all_regions = list(country_regions_organizations.Region.unique())
     
     if not input_folder_prefix[-1:] == '/':
         input_folder_prefix = input_folder_prefix+'/'
@@ -208,7 +225,9 @@ def calculate_country_indicators(current_year=2023,
     
     country_totals = country_totals.replace(np.nan,0)
     country_final_values = country_totals.copy()
-    region_totals = pd.DataFrame(index = ['world', *all_regions, *all_orgs], columns=full_indicator_names)
+    
+    # region_totals = pd.DataFrame(index = ['world', *all_regions, *all_orgs], columns=full_indicator_names)
+    region_totals = pd.DataFrame(index = ['world', *all_un_continents, *all_un_regions, *all_worldbank_regions, *all_worldbank_income], columns=full_indicator_names)
     region_totals = region_totals.replace(np.nan,0)
     region_final_values = region_totals.copy()
     
@@ -219,6 +238,7 @@ def calculate_country_indicators(current_year=2023,
     print('iterating through cities_out/')
     for city_folder in tqdm(os.listdir(f'{input_folder_prefix}')):
         if os.path.exists(f'{input_folder_prefix}{city_folder}/indicator_values_{current_year}.csv'):
+            # city_folder = "ghsl_region_02732"
             city_results = gpd.read_file(f'{input_folder_prefix}{city_folder}/indicator_values_{current_year}.gpkg')
             #first add to list of full cities
             hdc = city_folder.split('_')[-1]
@@ -231,16 +251,22 @@ def calculate_country_indicators(current_year=2023,
             
             #then calculate by country
             for country in city_results.country.unique():
+                # country = "JPN"
                 if type(country) == type('this is a string, which means it is not np.nan') and country in countries_ISO:
                     if country in country_regions_organizations.index:
-                        region = country_regions_organizations.loc[country, 'Region']
-                        organizations = list(country_regions_organizations.loc[country,all_orgs][country_regions_organizations.loc[country,all_orgs].notnull()].values)
-                        aggregations = ['world',region, *organizations]
+                        # region = country_regions_organizations.loc[country, 'Region']
+                        # organizations = list(country_regions_organizations.loc[country,all_orgs][country_regions_organizations.loc[country,all_orgs].notnull()].values)
+                        un_continent = country_regions_organizations.loc[country, 'UN_Continent']
+                        un_region = country_regions_organizations.loc[country, 'UN_Region']
+                        worldbank_region = country_regions_organizations.loc[country, 'World_Bank_Region']
+                        worldbank_income = country_regions_organizations.loc[country, 'World_Bank_Income_Group']
+                        aggregations = ['world',un_continent, un_region, worldbank_region, worldbank_income]
                     else:
                         aggregations = ['world']
 
                     #first total population
                     for year in rt_and_pop_years:
+                        # year = 2025
                         total_pop_year = city_results[city_results.country == country][f'total_pop_{year}'].sum()
                         country_totals.loc[country, f'total_pop_{year}'] += total_pop_year
                         for aggregation in aggregations:
@@ -280,7 +306,9 @@ def calculate_country_indicators(current_year=2023,
     #get weighted averages
     print('iterating through countries')
     for country in tqdm(countries_ISO):
+        # country = "BRA"
         for indicator in full_indicator_names:
+            # indicator = "schools_2023"
             year = indicator[-4:]
             if indicator in country_totals.columns:
                 
@@ -299,7 +327,9 @@ def calculate_country_indicators(current_year=2023,
                     country_final_values.loc[country, indicator] = weighted_avg
     print('iterating through regions/orgs')
     for region in tqdm(list(region_totals.index)):
+        # region = "Northern America"
         for indicator in full_indicator_names:
+            # indicator = "pnft_2023"
             year = indicator[-4:]
             if indicator in region_totals.columns:
                 

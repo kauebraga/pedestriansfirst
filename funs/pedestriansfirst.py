@@ -361,7 +361,7 @@ def spatial_analysis(boundaries,
         #itdp_modes = rt_lines.apply(lambda z: get_line_mode(z['mode'], z['name'], z['agency'], z['region'], z['grade'], z['brt_rating']), axis=1)        
         #rt_lines['rt_mode'] = itdp_modes
         for lineidx in rt_lines.index:
-            # lineidx = 0
+            # lineidx = 4
             itdp_mode = get_line_mode(rt_lines.loc[lineidx,'mode'], rt_lines.loc[lineidx,'name'], rt_lines.loc[lineidx,'agency'], rt_lines.loc[lineidx,'region'], rt_lines.loc[lineidx,'grade'], rt_lines.loc[lineidx,'brt_rating'], current_year)
             rt_lines.loc[lineidx,'rt_mode'] = itdp_mode
         
@@ -1255,6 +1255,8 @@ def people_near_x(service_gdf_utm, folder_name, boundaries_utm, year, sqkm_per_p
         return total_PNS
 
 
+
+
 def calculate_indicators(analysis_areas, 
                       folder_name='', 
                       to_test = [
@@ -1391,6 +1393,7 @@ def calculate_indicators(analysis_areas,
     # 2. Iterate through analysis_areas gdf, calculate all indicators
     # idx = 202
     for idx in analysis_areas.index:
+        # idx = 4
         try:
             print('getting results for', analysis_areas.loc[idx, 'name'])
             
@@ -1406,7 +1409,7 @@ def calculate_indicators(analysis_areas,
             # 2.1 Get total_pop for each area, so that we can measure PNx.
             #     Get density at the same time for convenience.
             # 2.1.1 First do years where we have GHSL data...
-            # year = 2025
+            # year = 2024
             for year in years:
                 if (year % 5) == 0:
                     # idx = 138
@@ -1414,7 +1417,7 @@ def calculate_indicators(analysis_areas,
                     pop_stats = rasterstats.zonal_stats(
                         analysis_areas_mw.loc[idx,'geometry'],
                         f"{folder_name}geodata/population/pop_{year}.tif", 
-                        stats=['mean'], 
+                        stats=['mean'],
                         all_touched=True
                         ) 
                     mean_density_per_km2 = pop_stats[0]['mean'] / sqkm_per_pixel
@@ -1454,6 +1457,7 @@ def calculate_indicators(analysis_areas,
                         'pnft','pnst','carfree','highways','special']
             for service in services:
                 if service in to_test:
+                    # service = "pnpb"
                     total_PNS = people_near_x(
                         service_gdfs_utm[service],
                         folder_name, 

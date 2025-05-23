@@ -33,6 +33,7 @@ import pdb
 # hdc = "07532" # chicago
 # hdc = "08255" # boston
 # hdc = "99999" # kohima
+# hdc = "08154" # kohima
 
 def get_jurisdictions(hdc,
                       minimum_portion = 0.5, #portion of a jurisdiction that has to be within the poly
@@ -97,6 +98,8 @@ def get_jurisdictions(hdc,
     
     #get CGAZ data here, also use it for clipping coastline
     country_bounds = gpd.read_file('input_data/CGAZ/geoBoundaries_ITDPv5.gpkg')
+    # country_bounds = gpd.read_file("input_data/regions/itdp_boundaries_updated.gpkg")
+    
     country_bounds.crs=4326
     country_bounds.geometry = country_bounds.make_valid()
     earth_utm = country_bounds.to_crs(crs = poly_utm_gdf.crs)
@@ -186,7 +189,8 @@ def get_jurisdictions(hdc,
     if 'admin_level' in jurisdictions_latlon.columns:
         print(f'found {len(jurisdictions_latlon)} on first pass')
         jurisdictions_utm = jurisdictions_latlon.to_crs(buffered_poly_utm_gdf.crs)
-        jurisdictions_utm = gpd.clip(jurisdictions_utm, nearby_land_gdf_utm.unary_union)
+        # UNCOMMENTS LATER
+        # jurisdictions_utm = gpd.clip(jurisdictions_utm, nearby_land_gdf_utm.unary_union)
         jurisdictions_clipped_utm = jurisdictions_utm.intersection(buffered_poly_utm)
         selection = (jurisdictions_clipped_utm.area / jurisdictions_utm.area) > minimum_portion
         select_jurisdictions_utm = jurisdictions_utm[selection]
@@ -227,9 +231,7 @@ def get_jurisdictions(hdc,
             jurisdictions_utm = jurisdictions_latlon.to_crs(buffered_poly_utm_gdf.crs)
             # jurisdictions_utm.to_file('teste_kaue/teste_salvadorbefore.gpkg')
             # THE PROBLEM IS ON THIS STEP!!!!
-            jurisdictions_utm = gpd.clip(jurisdictions_utm, nearby_land_gdf_utm.unary_union)
-            # nearby_land_gdf_utm.to_file('teste_kaue/teste_salvador323_parcial.gpkg')
-            # jurisdictions_utm.to_file('teste_kaue/teste_salvador323.gpkg')
+            # jurisdictions_utm = gpd.clip(jurisdictions_utm, nearby_land_gdf_utm.unary_union)
             jurisdictions_clipped_utm = jurisdictions_utm.intersection(total_boundaries_utm)
             selection = (jurisdictions_clipped_utm.area / jurisdictions_utm.area) > 0.95
             select_jurisdictions_utm = jurisdictions_utm[selection]
@@ -310,3 +312,5 @@ def get_jurisdictions(hdc,
 # apply function
 # teste = get_jurisdictions(hdc = 11480) # this one worked
 # teste = get_jurisdictions(hdc = 17)
+# teste = get_jurisdictions(hdc = "08154")
+# teste.to_file(f'teste_kaue/for_analysis_areas.gpkg', driver='GPKG')
