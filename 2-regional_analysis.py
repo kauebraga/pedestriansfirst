@@ -82,7 +82,7 @@ ox.settings.overpass_rate_limit = False
 # hdc = "05816" # london
 # hdc = "00992" # amman
 # hdc = "00213" # kohima
-# hdc = "05402" # cdmx
+# hdc = "02006" # cdmx
 # hdc = "08238" # Salvador
 
 
