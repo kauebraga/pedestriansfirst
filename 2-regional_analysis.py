@@ -84,6 +84,7 @@ ox.settings.overpass_rate_limit = False
 # hdc = "00213" # kohima
 # hdc = "02006" # cdmx
 # hdc = "08238" # Salvador
+# hdc = "01590" # Amsterdam
 
 
 # folder_prefix = '/media/kauebraga/data/pedestriansfirst/cities_out'; current_year=2024; minimum_portion=0.5;
@@ -158,7 +159,7 @@ def regional_analysis(hdc, to_test, folder_prefix = '/media/kauebraga/data/pedes
 
     
     
-    #If we're going to do any access-based indicators
+    e#If we're going to do any access-based indicators
     #Let's make sure to buffer this to include peripheral roads etc for routing
     total_poly_latlon=analysis_areas.unary_union
     total_poly_latlon = shapely.convex_hull(total_poly_latlon)   
