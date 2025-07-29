@@ -289,7 +289,7 @@ def run_analysis(hdc):
     to_test=['pnrt'],
     summarize=False,
     jurisdictions=False,
-    current_year=2023,
+    current_year=2024,
     prep=False,
     analyse=True
     )
@@ -346,11 +346,11 @@ def run_analysis(hdc):
     jurisdictions=False,
     prep=False,
     analyse=False,
-    current_year=2023
+    current_year=2024
     )
 
 # set up cluster with 20 workers. Each worker uses 1 thread and has a 64GB memory limit.
-client = Client(n_workers=24,threads_per_worker=1,memory_limit='64GB')
+client = Client(n_workers=23,threads_per_worker=1,memory_limit='64GB')
 
 
 @dask.delayed

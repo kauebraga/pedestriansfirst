@@ -192,7 +192,7 @@ def spatial_analysis(boundaries,
                             'highways':500,
                             },
                       # years = [2023], #for PNRT and pop_dens. remember range(1,3) = [1,2]
-                      years = [1975, 1980, 1985, 1990, 1995, 2000, 2005, 2010, 2015, 2020, 2022, 2023, 2025], #for PNRT and pop_dens. remember range(1,3) = [1,2]
+                      years = [1975, 1980, 1985, 1990, 1995, 2000, 2005, 2010, 2015, 2020, 2022, 2023, 2024, 2025], #for PNRT and pop_dens. remember range(1,3) = [1,2]
                       current_year = 2023,
                       patch_length = 100000, #m
                       block_patch_length = 1000, #m
